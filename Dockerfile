@@ -1,5 +1,5 @@
 # Multi-stage build for VibeTune
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -32,7 +32,7 @@ RUN mkdir -p storage/offline storage/cache logs
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 # Install system dependencies for production
 RUN apk add --no-cache \
