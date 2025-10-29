@@ -17,13 +17,10 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY pnpm-lock.yaml ./
+COPY package-lock.json ./
 
-# Install the exact pnpm version expected by the repo
-RUN npm install -g pnpm@10.14.0
-
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies using npm
+RUN npm ci --only=production
 
 # Copy source code
 COPY . .
@@ -55,15 +52,12 @@ RUN adduser -S vibetune -u 1001
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files  
 COPY package*.json ./
-COPY pnpm-lock.yaml ./
-
-# Install the exact pnpm version expected by the repo
-RUN npm install -g pnpm@10.14.0
+COPY package-lock.json ./
 
 # Install only production dependencies
-RUN pnpm install --prod --frozen-lockfile
+RUN npm ci --only=production
 
 # Copy built application from builder stage
 COPY --from=builder --chown=vibetune:nodejs /app/dist ./dist
