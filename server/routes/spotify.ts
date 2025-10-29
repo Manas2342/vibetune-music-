@@ -362,6 +362,52 @@ export const getTopItems: RequestHandler = async (req: AuthenticatedRequest, res
   }
 };
 
+// Get user's top tracks
+export const getTopTracks: RequestHandler = async (req: AuthenticatedRequest, res) => {
+  try {
+    const { limit = 20, offset = 0, time_range = 'medium_term' } = req.query;
+    
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const items = await spotifyService.getTopItems(
+      'tracks',
+      req.user.spotifyAccessToken,
+      Number(limit),
+      Number(offset),
+      time_range as 'short_term' | 'medium_term' | 'long_term'
+    );
+    res.json(items);
+  } catch (error) {
+    console.error('Error getting top tracks:', error);
+    res.status(500).json({ error: 'Failed to get top tracks' });
+  }
+};
+
+// Get user's top artists
+export const getTopArtistsForUser: RequestHandler = async (req: AuthenticatedRequest, res) => {
+  try {
+    const { limit = 20, offset = 0, time_range = 'medium_term' } = req.query;
+    
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const items = await spotifyService.getTopItems(
+      'artists',
+      req.user.spotifyAccessToken,
+      Number(limit),
+      Number(offset),
+      time_range as 'short_term' | 'medium_term' | 'long_term'
+    );
+    res.json(items);
+  } catch (error) {
+    console.error('Error getting top artists:', error);
+    res.status(500).json({ error: 'Failed to get top artists' });
+  }
+};
+
 // Get top artists (public endpoint using client credentials)
 export const getTopArtists: RequestHandler = async (req: AuthenticatedRequest, res) => {
   try {

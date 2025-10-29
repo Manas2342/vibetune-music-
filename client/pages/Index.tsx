@@ -6,7 +6,7 @@ import spotifyService from "../services/spotifyService";
 import { Link, useNavigate } from "react-router-dom";
 import { useMusicPlayer } from "@/contexts/EnhancedMusicPlayerContext";
 import { useLibrary } from "@/contexts/LibraryContext";
-import { demoMusicService } from "@/services/demoMusicService";
+// Removed demoMusicService - now using real Spotify data
 import { useToast } from "@/hooks/use-toast";
 
 type NewRelease = { id: string; name: string; artists: { name: string }[]; images?: { url: string }[] };
@@ -24,6 +24,7 @@ export default function Index() {
   const [topArtists, setTopArtists] = useState<TopArtist[]>([]);
   const [recentlyPlayed, setRecentlyPlayed] = useState<PlayedItem[]>([]);
   const [vibetuneRecentlyPlayed, setVibetuneRecentlyPlayed] = useState<PlayedItem[]>([]);
+  const [featuredPlaylists, setFeaturedPlaylists] = useState<any[]>([]);
   const [isSpotifyConnected, setIsSpotifyConnected] = useState(false);
   const { playTrack } = useMusicPlayer();
   const { toggleLike, isLiked, likedSongs, playlists } = useLibrary();
@@ -79,6 +80,10 @@ export default function Index() {
       try {
         const ta = await spotifyService.getTopArtists(12, 0);
         setTopArtists(ta.artists?.items || []);
+      } catch {}
+      try {
+        const fp = await spotifyService.getFeaturedPlaylists(6, 0);
+        setFeaturedPlaylists(fp.playlists?.items || []);
       } catch {}
       
       // Fetch real recently played tracks from Spotify (only if authenticated)
@@ -264,50 +269,42 @@ export default function Index() {
         </div>
       </div>
 
-      {/* Demo Music Section */}
+      {/* Featured Playlists Section */}
       <section className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-white">🎵 Try Demo Music</h2>
-          <p className="text-sm text-vibetune-text-muted">Click to test audio playback</p>
+          <h2 className="text-2xl font-bold text-white">🎵 Featured Playlists</h2>
+          <p className="text-sm text-vibetune-text-muted">Curated playlists from Spotify</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {demoMusicService.getDemoTracks().map((demoTrack) => (
+          {featuredPlaylists.map((playlist) => (
             <div
-              key={demoTrack.id}
+              key={playlist.id}
               className="group bg-vibetune-gray/40 hover:bg-vibetune-gray/60 rounded-lg p-4 transition-all duration-300 cursor-pointer"
-              onClick={async () => {
-                try {
-                  console.log('🎵 Playing demo track:', demoTrack.title);
-                  toast({
-                    title: "🎵 Loading Demo Track",
-                    description: `Playing ${demoTrack.title} by ${demoTrack.artist}`,
-                  });
-                  await playTrack(demoMusicService.convertToTrack(demoTrack));
-                } catch (error) {
-                  console.error('Error playing demo track:', error);
-                  toast({
-                    title: "❌ Playback Error",
-                    description: "Failed to play demo track. Please try again.",
-                    variant: "destructive",
-                  });
-                }
-              }}
+              onClick={() => navigate(`/playlist/${playlist.id}`)}
             >
               <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-vibetune-green to-blue-600 rounded-lg flex items-center justify-center">
-                  <Music className="w-8 h-8 text-white" />
+                <div className="w-16 h-16 bg-gradient-to-br from-vibetune-green to-blue-600 rounded-lg flex items-center justify-center overflow-hidden">
+                  {playlist.images?.[0]?.url ? (
+                    <img 
+                      src={playlist.images[0].url} 
+                      alt={playlist.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Music className="w-8 h-8 text-white" />
+                  )}
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-white">{demoTrack.title}</h3>
-                  <p className="text-sm text-vibetune-text-muted">{demoTrack.artist}</p>
-                  <p className="text-xs text-vibetune-text-muted">{demoTrack.genre}</p>
+                  <h3 className="font-semibold text-white">{playlist.name}</h3>
+                  <p className="text-sm text-vibetune-text-muted">{playlist.description}</p>
+                  <p className="text-xs text-vibetune-text-muted">{playlist.tracks?.total || 0} tracks</p>
                 </div>
                 <Button
                   size="sm"
                   className="opacity-0 group-hover:opacity-100 transition-opacity bg-vibetune-green hover:bg-vibetune-green-dark text-black rounded-full w-12 h-12 p-0"
                   onClick={(e) => {
                     e.stopPropagation();
-                    // handled by parent onClick
+                    navigate(`/playlist/${playlist.id}`);
                   }}
                 >
                   <Play className="w-5 h-5 ml-0.5" />

@@ -24,7 +24,7 @@ export function EmotionSongRecommendations({ emotion, className }: EmotionSongRe
 
   useEffect(() => {
     console.log('🎭 useEffect triggered with emotion:', emotion);
-    if (emotion && emotion.confidence > 0.3) {
+    if (emotion && emotion.confidence > 0.2) { // Lowered threshold from 0.3 to 0.2
       console.log(`🎭 Emotion detected: ${emotion.emotion} with confidence: ${emotion.confidence}`);
       fetchSongRecommendations(emotion.emotion);
     } else {
@@ -112,7 +112,7 @@ export function EmotionSongRecommendations({ emotion, className }: EmotionSongRe
                 onClick={() => fetchSongRecommendations('happy')}
                 className="text-xs"
               >
-                Test Happy
+                😊 Happy
               </Button>
               <Button
                 size="sm"
@@ -120,7 +120,47 @@ export function EmotionSongRecommendations({ emotion, className }: EmotionSongRe
                 onClick={() => fetchSongRecommendations('sad')}
                 className="text-xs"
               >
-                Test Sad
+                😢 Sad
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fetchSongRecommendations('angry')}
+                className="text-xs"
+              >
+                😠 Angry
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fetchSongRecommendations('surprised')}
+                className="text-xs"
+              >
+                😲 Surprised
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fetchSongRecommendations('fearful')}
+                className="text-xs"
+              >
+                😨 Fearful
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fetchSongRecommendations('disgusted')}
+                className="text-xs"
+              >
+                🤢 Disgusted
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fetchSongRecommendations('neutral')}
+                className="text-xs"
+              >
+                😐 Neutral
               </Button>
               <Button
                 size="sm"

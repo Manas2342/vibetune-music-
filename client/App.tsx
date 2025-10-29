@@ -29,6 +29,8 @@ import Social from "./pages/Social";
 import LikedSongs from "./pages/LikedSongs";
 import CreatePlaylist from "./pages/CreatePlaylist";
 import Artist from "./pages/Artist";
+import Trending from "./pages/Trending";
+import ArtistDiscovery from "./pages/ArtistDiscovery";
 
 const queryClient = new QueryClient();
 
@@ -69,6 +71,22 @@ function MainApp() {
       <Route path="/callback" element={<SpotifyCallback />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      <Route
+        path="/trending"
+        element={
+          <Layout>
+            <Trending />
+          </Layout>
+        }
+      />
+      <Route
+        path="/artists"
+        element={
+          <Layout>
+            <ArtistDiscovery />
+          </Layout>
+        }
+      />
       <Route
         path="/"
         element={

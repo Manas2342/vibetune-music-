@@ -31,6 +31,8 @@ import {
   getSavedAlbums,
   getFollowedArtists,
   getTopItems,
+  getTopTracks,
+  getTopArtistsForUser,
   getTopArtists,
   getRecentlyPlayed,
   getFeaturedPlaylists,
@@ -94,8 +96,8 @@ export function createServer() {
   // Middleware
   app.use(cors({
     origin: process.env.NODE_ENV === 'production' ? 
-      ['https://vibetune.netlify.app', 'https://www.vibetune.app'] :
-      ['http://localhost:3000', 'http://localhost:5173'],
+      ['https://www.vibetune.app'] :
+      ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080', 'http://127.0.0.1:8080'],
     credentials: true,
   }));
   app.use(express.json());
@@ -142,6 +144,8 @@ export function createServer() {
   app.get("/api/spotify/me/albums", authenticate, getSavedAlbums);
   app.get("/api/spotify/me/following", authenticate, getFollowedArtists);
   app.get("/api/spotify/me/top/:type", authenticate, getTopItems);
+  app.get("/api/spotify/top/tracks", authenticate, getTopTracks);
+  app.get("/api/spotify/top/artists", authenticate, getTopArtistsForUser);
   app.get("/api/spotify/top-artists", optionalAuthenticate, getTopArtists);
   app.get("/api/spotify/me/player/recently-played", authenticate, getRecentlyPlayed);
   app.get("/api/spotify/me/tracks/contains", authenticate, checkSavedTracks);

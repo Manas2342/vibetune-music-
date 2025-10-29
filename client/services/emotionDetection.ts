@@ -102,54 +102,54 @@ class EmotionDetectionService {
   private detectEmotionsFallback(): FaceWithEmotion[] {
     console.log('🎲 Generating fallback emotion...');
     
-    // More realistic fallback emotion detection with time-based patterns
+    // More balanced emotion detection with equal weights for all emotions
     const hour = new Date().getHours();
     const minute = new Date().getMinutes();
     const second = new Date().getSeconds();
     
-    // Create emotion weights based on time of day for more realistic results
+    // Equal weights for all emotions to ensure variety
     let emotionWeights = {
-      happy: 0.25,
-      neutral: 0.20,
-      surprised: 0.15,
+      happy: 0.15,
       sad: 0.15,
-      angry: 0.10,
-      fearful: 0.08,
-      disgusted: 0.07
+      angry: 0.15,
+      surprised: 0.15,
+      fearful: 0.15,
+      disgusted: 0.15,
+      neutral: 0.10  // Slightly lower but still included
     };
     
-    // Adjust weights based on time for more variety
-    if (hour >= 6 && hour <= 11) { // Morning - more happy/energetic
-      emotionWeights.happy += 0.25;
-      emotionWeights.surprised += 0.10;
-      emotionWeights.neutral -= 0.15;
-    } else if (hour >= 12 && hour <= 17) { // Afternoon - balanced
-      emotionWeights.neutral += 0.15;
-      emotionWeights.happy += 0.10;
-    } else if (hour >= 18 && hour <= 22) { // Evening - more relaxed
-      emotionWeights.neutral += 0.20;
-      emotionWeights.happy -= 0.05;
-    } else { // Night - more tired/sad
-      emotionWeights.sad += 0.20;
-      emotionWeights.neutral += 0.10;
-      emotionWeights.happy -= 0.20;
-    }
+    // Create more frequent cycling for better testing - change every 30 seconds
+    const cycleTime = Math.floor((hour * 60 + minute + second / 60) * 2); // Change every 30 seconds
+    const emotions = ['happy', 'sad', 'angry', 'surprised', 'fearful', 'disgusted', 'neutral'];
+    const cycleIndex = cycleTime % emotions.length;
+    const cycleEmotion = emotions[cycleIndex];
     
-    // Add variety based on seconds for more dynamic changes
-    const timeBasedVariation = (second % 7) / 20; // Creates some variation
-    const selectedEmotion = this.weightedRandomEmotion(emotionWeights, timeBasedVariation);
+    // Boost the cycled emotion significantly
+    emotionWeights[cycleEmotion as keyof typeof emotionWeights] = 0.6;
     
-    // Generate realistic emotion scores with higher confidence for better demo
-    const dominantScore = 0.60 + Math.random() * 0.35; // 0.60-0.95 for more confident predictions
+    // Reduce others
+    Object.keys(emotionWeights).forEach(key => {
+      if (key !== cycleEmotion) {
+        emotionWeights[key as keyof typeof emotionWeights] = 0.4 / 6; // Distribute remaining 40% among 6 emotions
+      }
+    });
+    
+    // Add some randomness but keep it controlled
+    const randomFactor = Math.random() * 0.1; // Reduced randomness for more predictable results
+    const selectedEmotion = this.weightedRandomEmotion(emotionWeights, randomFactor);
+    
+    // Generate high confidence predictions
+    const dominantScore = 0.80 + Math.random() * 0.15; // 0.80-0.95 for high confidence
     const remainingScore = 1 - dominantScore;
+    
     const scores: EmotionScores = {
-      neutral: 0.05,
-      happy: 0.05,
-      sad: 0.05,
-      angry: 0.05,
-      fearful: 0.05,
-      disgusted: 0.05,
-      surprised: 0.05,
+      neutral: 0.01,
+      happy: 0.01,
+      sad: 0.01,
+      angry: 0.01,
+      fearful: 0.01,
+      disgusted: 0.01,
+      surprised: 0.01,
     };
     
     // Set the dominant emotion
@@ -160,8 +160,8 @@ class EmotionDetectionService {
     const baseOtherScore = remainingScore / otherEmotions.length;
     
     otherEmotions.forEach(emotion => {
-      const variance = (Math.random() - 0.5) * 0.15; // More variation
-      scores[emotion as keyof EmotionScores] = Math.max(0.01, baseOtherScore + variance);
+      const variance = (Math.random() - 0.5) * 0.05; // Reduced variance for more stable results
+      scores[emotion as keyof EmotionScores] = Math.max(0.005, baseOtherScore + variance);
     });
     
     // Normalize to ensure sum equals 1
@@ -171,11 +171,12 @@ class EmotionDetectionService {
     });
     
     console.log(`🎲 Generated fallback emotion: ${selectedEmotion} (${Math.round(dominantScore * 100)}% confidence)`);
+    console.log('🎲 Fallback emotion scores:', scores);
     
     return [{
       detection: {
         box: { x: 150, y: 120, width: 300, height: 300 },
-        score: 0.85,
+        score: 0.90,
         imageDims: { width: 640, height: 480 }
       } as any,
       expressions: {} as any,
@@ -223,6 +224,7 @@ class EmotionDetectionService {
     let dominantEmotion = 'neutral';
     let maxConfidence = scores.neutral;
 
+    // Find the emotion with the highest confidence
     Object.entries(scores).forEach(([emotion, confidence]) => {
       if (confidence > maxConfidence) {
         dominantEmotion = emotion;
@@ -230,8 +232,27 @@ class EmotionDetectionService {
       }
     });
     
+    // Enhanced logging for debugging
     console.log('🎭 Face-api.js emotion scores:', scores);
     console.log(`🏆 Dominant emotion: ${dominantEmotion} (${Math.round(maxConfidence * 100)}%)`);
+    
+    // If confidence is too low, try to boost non-neutral emotions
+    if (maxConfidence < 0.2 && dominantEmotion === 'neutral') {
+      console.log('⚠️ Low confidence neutral detection, checking for other emotions...');
+      
+      // Look for any emotion with reasonable confidence - much more sensitive
+      const nonNeutralEmotions = Object.entries(scores).filter(([emotion, confidence]) => 
+        emotion !== 'neutral' && confidence > 0.1
+      );
+      
+      if (nonNeutralEmotions.length > 0) {
+        // Sort by confidence and pick the highest
+        nonNeutralEmotions.sort((a, b) => b[1] - a[1]);
+        dominantEmotion = nonNeutralEmotions[0][0];
+        maxConfidence = nonNeutralEmotions[0][1];
+        console.log(`🔄 Switched to ${dominantEmotion} with ${Math.round(maxConfidence * 100)}% confidence`);
+      }
+    }
 
     return {
       emotion: dominantEmotion,
@@ -265,6 +286,38 @@ class EmotionDetectionService {
       neutral: '😐',
     };
     return emojis[emotion as keyof typeof emojis] || emojis.neutral;
+  }
+
+  // Force a specific emotion for testing
+  forceEmotion(emotion: string): FaceWithEmotion[] {
+    console.log(`🎭 Forcing emotion: ${emotion}`);
+    
+    const scores: EmotionScores = {
+      neutral: 0.01,
+      happy: 0.01,
+      sad: 0.01,
+      angry: 0.01,
+      fearful: 0.01,
+      disgusted: 0.01,
+      surprised: 0.01,
+    };
+    
+    // Set the forced emotion to high confidence
+    scores[emotion as keyof EmotionScores] = 0.95;
+    
+    return [{
+      detection: {
+        box: { x: 150, y: 120, width: 300, height: 300 },
+        score: 0.95,
+        imageDims: { width: 640, height: 480 }
+      } as any,
+      expressions: {} as any,
+      emotion: {
+        emotion: emotion,
+        confidence: 0.95,
+        scores: scores,
+      }
+    }];
   }
 }
 

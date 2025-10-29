@@ -40,6 +40,11 @@ export function useWebcamWithFaceDetection() {
     facesWithEmotions: [],
   });
   
+  // Add debouncing for emotion detection
+  const lastEmotionRef = useRef<string | null>(null);
+  const lastEmotionTimeRef = useRef<number>(0);
+  const emotionDebounceDelay = 3000; // 3 seconds delay between emotion changes
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const detectionCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -149,8 +154,19 @@ export function useWebcamWithFaceDetection() {
     
     try {
       console.log('✅ Starting emotion analysis on video element');
-      // Use emotion detection service to analyze video frame
-      const facesWithEmotions = await emotionDetectionService.detectEmotions(videoElement);
+      
+      // Check if we should use forced emotion for testing
+      const urlParams = new URLSearchParams(window.location.search);
+      const forceEmotion = urlParams.get('forceEmotion');
+      
+      let facesWithEmotions;
+      if (forceEmotion) {
+        console.log(`🎭 Using forced emotion: ${forceEmotion}`);
+        facesWithEmotions = emotionDetectionService.forceEmotion(forceEmotion);
+      } else {
+        // Use emotion detection service to analyze video frame
+        facesWithEmotions = await emotionDetectionService.detectEmotions(videoElement);
+      }
       
       console.log(`Found ${facesWithEmotions.length} faces with emotions`);
       
@@ -158,16 +174,31 @@ export function useWebcamWithFaceDetection() {
       const emotionData = facesWithEmotions.length > 0 ? facesWithEmotions[0].emotion : null;
       
       if (emotionData) {
-        console.log('✅ Updating state with emotion:', emotionData.emotion, 'confidence:', emotionData.confidence);
+        const currentTime = Date.now();
+        const currentEmotion = emotionData.emotion;
+        
+        // Check if we should update the emotion (debouncing)
+        const shouldUpdate = 
+          lastEmotionRef.current === null || // First detection
+          lastEmotionRef.current !== currentEmotion || // Different emotion
+          (currentTime - lastEmotionTimeRef.current) > emotionDebounceDelay; // Enough time passed
+        
+        if (shouldUpdate) {
+          console.log('✅ Updating state with emotion:', emotionData.emotion, 'confidence:', emotionData.confidence);
+          lastEmotionRef.current = currentEmotion;
+          lastEmotionTimeRef.current = currentTime;
+          
+          setState(prev => ({
+            ...prev,
+            emotionData,
+            facesWithEmotions,
+          }));
+        } else {
+          console.log('⏳ Emotion change debounced, keeping current emotion:', lastEmotionRef.current);
+        }
       } else {
         console.log('ℹ️ No faces detected for emotion analysis');
       }
-      
-      setState(prev => ({
-        ...prev,
-        emotionData,
-        facesWithEmotions,
-      }));
     } catch (error) {
       console.error('❌ Emotion detection error:', error);
     }

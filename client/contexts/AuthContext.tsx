@@ -136,9 +136,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      // Clear local storage
+      // Clear all local storage
       localStorage.removeItem('vibetune_user');
       localStorage.removeItem('vibetune_session');
+      localStorage.removeItem('spotifySessionToken');
+      localStorage.removeItem('spotify_access_token');
+      localStorage.removeItem('spotify_refresh_token');
+      
+      // Redirect to login page
+      window.location.href = '/login';
     } catch (error) {
       console.error('Error during logout:', error);
     } finally {
