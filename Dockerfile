@@ -15,17 +15,14 @@ RUN apk add --no-cache \
 # Set working directory
 WORKDIR /app
 
-# Configure npm for better reliability
-RUN npm config set fund false && \
-    npm config set audit false && \
-    npm config set optional false
+# (Keep npm defaults; we'll pass flags to install to avoid issues)
 
 # Copy package files
 COPY package*.json ./
 COPY package-lock.json ./
 
-# Install all dependencies (using install instead of ci for better compatibility)
-RUN npm install --legacy-peer-deps --no-audit --no-fund
+# Install all dependencies (omit optional to reduce failures)
+RUN npm install --legacy-peer-deps --no-audit --no-fund --omit=optional
 
 # Copy source code
 COPY . .
@@ -39,12 +36,10 @@ RUN npm run build
 # Copy environment template
 COPY env.example .env
 
-# Expose port (Render will use PORT env var at runtime)
-EXPOSE 10000
+# Expose port (server defaults to 8080; Render sets PORT at runtime)
+EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget -q --spider http://localhost:8084/api/ping || exit 1
+# Remove healthcheck to avoid false negatives during cold starts
 
 # Start the application
 CMD ["npm", "start"]
