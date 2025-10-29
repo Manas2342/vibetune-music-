@@ -75,8 +75,8 @@ COPY --from=builder --chown=vibetune:nodejs /app/shared ./shared
 RUN mkdir -p storage/offline storage/cache logs && \
     chown -R vibetune:nodejs storage logs
 
-# Copy environment template
-COPY .env.example .env
+# Copy environment template (filename in repo is env.example)
+COPY env.example .env
 
 # Switch to non-root user
 USER vibetune
