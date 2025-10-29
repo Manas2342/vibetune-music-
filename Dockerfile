@@ -15,12 +15,17 @@ RUN apk add --no-cache \
 # Set working directory
 WORKDIR /app
 
+# Configure npm for better reliability
+RUN npm config set fund false && \
+    npm config set audit false && \
+    npm config set optional false
+
 # Copy package files
 COPY package*.json ./
 COPY package-lock.json ./
 
-# Install all dependencies
-RUN npm ci
+# Install all dependencies (using install instead of ci for better compatibility)
+RUN npm install --legacy-peer-deps --no-audit --no-fund
 
 # Copy source code
 COPY . .
@@ -34,8 +39,8 @@ RUN npm run build
 # Copy environment template
 COPY env.example .env
 
-# Expose port
-EXPOSE 8084
+# Expose port (Render will use PORT env var at runtime)
+EXPOSE 10000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
