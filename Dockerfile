@@ -1,45 +1,28 @@
-# Simple single-stage build for VibeTune
 FROM node:20-alpine
 
 # Install system dependencies
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    sqlite \
-    sqlite-dev \
-    ffmpeg \
-    wget \
-    curl
+RUN apk add --no-cache python3 make g++ sqlite sqlite-dev ffmpeg
 
-# Set working directory
 WORKDIR /app
 
-# (Keep npm defaults; we'll pass flags to install to avoid issues)
-
-# Copy package files
+# Copy package files first for better caching
 COPY package*.json ./
-COPY package-lock.json ./
 
-# Install all dependencies (omit optional to reduce failures)
-RUN npm install --legacy-peer-deps --no-audit --no-fund --omit=optional
+# Install dependencies - simple install without flags
+RUN npm install
 
-# Copy source code
+# Copy all source code
 COPY . .
 
-# Create necessary directories
+# Create directories
 RUN mkdir -p storage/offline storage/cache logs
 
-# Build the application
+# Build
 RUN npm run build
 
-# Copy environment template
+# Copy env template
 COPY env.example .env
 
-# Expose port (server defaults to 8080; Render sets PORT at runtime)
 EXPOSE 8080
 
-# Remove healthcheck to avoid false negatives during cold starts
-
-# Start the application
 CMD ["npm", "start"]
