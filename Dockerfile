@@ -52,14 +52,8 @@ RUN adduser -S vibetune -u 1001
 # Set working directory
 WORKDIR /app
 
-# Copy package files  
-COPY package*.json ./
-COPY package-lock.json ./
-
-# Install only production dependencies
-RUN npm ci --only=production
-
-# Copy built application from builder stage
+# Copy node_modules and built application from builder stage
+COPY --from=builder --chown=vibetune:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=vibetune:nodejs /app/dist ./dist
 COPY --from=builder --chown=vibetune:nodejs /app/public ./public
 COPY --from=builder --chown=vibetune:nodejs /app/server ./server
