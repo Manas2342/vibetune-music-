@@ -19,8 +19,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY pnpm-lock.yaml ./
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install the exact pnpm version expected by the repo
+RUN npm install -g pnpm@10.14.0
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
@@ -59,8 +59,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY pnpm-lock.yaml ./
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install the exact pnpm version expected by the repo
+RUN npm install -g pnpm@10.14.0
 
 # Install only production dependencies
 RUN pnpm install --prod --frozen-lockfile
