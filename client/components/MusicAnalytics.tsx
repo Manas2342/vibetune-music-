@@ -523,3 +523,4 @@ const formatFollowers = (count: number) => {
 };
 
 export default MusicAnalytics;
+

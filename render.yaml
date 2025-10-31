@@ -11,7 +11,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 8084
+        value: 8080
       - key: HOST
         value: 0.0.0.0
       - key: DATABASE_URL
@@ -34,3 +34,4 @@ databases:
     plan: starter
     databaseName: vibetune
     user: vibetune
+

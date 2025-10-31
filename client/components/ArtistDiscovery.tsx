@@ -368,3 +368,4 @@ const ArtistDiscovery: React.FC = () => {
 };
 
 export default ArtistDiscovery;
+

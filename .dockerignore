@@ -17,6 +17,9 @@ git
 .git
 .gitignore
 README.md
+DEPLOYMENT_GUIDE.md
+QUICK_DEPLOY.md
+DEPLOYMENT_SUMMARY.md
 docs
 test
 __tests__
@@ -24,3 +27,14 @@ __tests__
 *.test.js
 *.spec.ts
 *.spec.js
+netlify-deploy.zip
+vibetune4-optimized.zip
+vibetune4-portable.zip
+audio-cache
+cache/audio
+**/*.zip
+**/netlify-deploy
+**/netlify-deploy/**
+vibetune4-lite
+.vite
+*.local

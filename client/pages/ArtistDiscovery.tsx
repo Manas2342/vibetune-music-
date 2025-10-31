@@ -6,3 +6,4 @@ const ArtistDiscoveryPage: React.FC = () => {
 };
 
 export default ArtistDiscoveryPage;
+

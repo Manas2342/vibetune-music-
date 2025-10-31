@@ -118,3 +118,4 @@ Your app: `https://your-app-name.railway.app`
 ✅ 100GB bandwidth/month
 
 Perfect for getting started! 🎵
+
