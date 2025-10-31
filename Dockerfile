@@ -1,51 +1,31 @@
-# Build stage
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 
-# Install build dependencies only
-RUN apk add --no-cache python3 make g++ sqlite-dev
+# Install all system dependencies once
+RUN apk add --no-cache python3 make g++ sqlite sqlite-dev ffmpeg
 
 WORKDIR /app
 
-# Copy package files for better Docker layer caching
+# Copy package files for better caching
 COPY package*.json ./
 
-# Install ALL dependencies (needed for build) - optimized for speed
-RUN npm install --legacy-peer-deps --no-audit --no-fund --prefer-offline
+# Install dependencies with aggressive optimization
+RUN npm install --legacy-peer-deps --no-audit --no-fund --prefer-offline --no-optional
 
 # Copy source code
 COPY . .
 
-# Create necessary directories
+# Create directories
 RUN mkdir -p storage/offline storage/cache logs
 
-# Build the application
+# Build application
 RUN npm run build
 
-# Production stage - minimal image
-FROM node:20-alpine AS production
-
-# Install only runtime dependencies
-RUN apk add --no-cache sqlite sqlite-dev ffmpeg
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install ONLY production dependencies (faster & smaller image)
-RUN npm install --only=production --legacy-peer-deps --no-audit --no-fund && \
+# Remove dev dependencies after build to reduce image size
+RUN npm prune --production --legacy-peer-deps && \
     npm cache clean --force && \
-    rm -rf /tmp/*
+    rm -rf /tmp/* /root/.npm
 
-# Copy built application from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/storage ./storage
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/models ./models
 COPY env.example .env
-
-# Create runtime directories
-RUN mkdir -p storage/offline storage/cache logs
 
 EXPOSE 8080
 
