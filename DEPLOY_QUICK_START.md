@@ -32,7 +32,7 @@ Your app is ready to deploy! Choose one option below:
    SESSION_SECRET=<generate-random>
    ```
 
-   Generate secrets: `openssl rand -hex 32`
+   **Or use pre-generated secrets** from [RENDER_ENV_VARS.md](./RENDER_ENV_VARS.md)
 
 6. **Deploy**: Click "Create Web Service"
 
@@ -72,7 +72,7 @@ Your app is ready to deploy! Choose one option below:
 
 1. **Root Directory MUST be**: `vibetune4`
 2. **Spotify Redirect URI** must match your deployment URL
-3. Generate **unique JWT_SECRET** and **SESSION_SECRET**
+3. Use pre-generated secrets from [RENDER_ENV_VARS.md](./RENDER_ENV_VARS.md)
 4. First deploy takes 10-15 minutes
 
 ---
