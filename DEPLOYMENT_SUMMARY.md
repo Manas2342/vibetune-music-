@@ -13,10 +13,10 @@ Your VibeTune music streaming app is **100% ready** to deploy to the cloud and g
 
 ### 📚 Deployment Documentation Created
 
-1. **[DEPLOY_QUICK_START.md](./vibetune4/DEPLOY_QUICK_START.md)** - Start here! 5-minute deployment guide
-2. **[GITHUB_DEPLOYMENT.md](./vibetune4/GITHUB_DEPLOYMENT.md)** - Detailed GitHub deployment instructions
-3. **[RENDER_ENV_VARS.md](./vibetune4/RENDER_ENV_VARS.md)** - Pre-configured environment variables
-4. **[DEPLOYMENT_GUIDE.md](./vibetune4/DEPLOYMENT_GUIDE.md)** - Comprehensive deployment options
+1. **[DEPLOY_QUICK_START.md](./DEPLOY_QUICK_START.md)** - Start here! 5-minute deployment guide
+2. **[GITHUB_DEPLOYMENT.md](./GITHUB_DEPLOYMENT.md)** - Detailed GitHub deployment instructions
+3. **[RENDER_ENV_VARS.md](./RENDER_ENV_VARS.md)** - Pre-configured environment variables
+4. **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Comprehensive deployment options
 
 ---
 
@@ -26,7 +26,7 @@ Your VibeTune music streaming app is **100% ready** to deploy to the cloud and g
 **Recommended**: Render.com (FREE tier available)
 
 ### Step 2: Follow Quick Start
-Read: **[DEPLOY_QUICK_START.md](./vibetune4/DEPLOY_QUICK_START.md)**
+Read: **[DEPLOY_QUICK_START.md](./DEPLOY_QUICK_START.md)**
 
 Basic steps:
 1. Go to https://render.com
@@ -46,7 +46,7 @@ Security secrets are already generated for you:
 - ✅ `JWT_SECRET`: Generated and ready
 - ✅ `SESSION_SECRET`: Generated and ready
 
-See: [RENDER_ENV_VARS.md](./vibetune4/RENDER_ENV_VARS.md)
+See: [RENDER_ENV_VARS.md](./RENDER_ENV_VARS.md)
 
 ---
 
@@ -54,16 +54,16 @@ See: [RENDER_ENV_VARS.md](./vibetune4/RENDER_ENV_VARS.md)
 
 | Document | Purpose |
 |----------|---------|
-| [DEPLOY_QUICK_START.md](./vibetune4/DEPLOY_QUICK_START.md) | ⚡ Fastest deployment path |
-| [GITHUB_DEPLOYMENT.md](./vibetune4/GITHUB_DEPLOYMENT.md) | 📖 Full deployment guide |
-| [RENDER_ENV_VARS.md](./vibetune4/RENDER_ENV_VARS.md) | 🔐 Copy-paste env vars |
-| [DEPLOYMENT_GUIDE.md](./vibetune4/DEPLOYMENT_GUIDE.md) | 📚 All options explained |
+| [DEPLOY_QUICK_START.md](./DEPLOY_QUICK_START.md) | ⚡ Fastest deployment path |
+| [GITHUB_DEPLOYMENT.md](./GITHUB_DEPLOYMENT.md) | 📖 Full deployment guide |
+| [RENDER_ENV_VARS.md](./RENDER_ENV_VARS.md) | 🔐 Copy-paste env vars |
+| [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | 📚 All options explained |
 
 ---
 
 ## ✅ Next Steps
 
-1. **Read**: [DEPLOY_QUICK_START.md](./vibetune4/DEPLOY_QUICK_START.md)
+1. **Read**: [DEPLOY_QUICK_START.md](./DEPLOY_QUICK_START.md)
 2. **Deploy**: Follow the 5-minute guide
 3. **Update Spotify**: Add redirect URI after deployment
 4. **Share**: Your live music app link!
