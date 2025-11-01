@@ -45,25 +45,38 @@ npm run dev
 
 The app will be available at `http://localhost:8080`
 
-## 📖 For Deployment Instructions
+## 📖 Deployment Instructions
 
-See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for detailed cloud deployment instructions.
+### 🚀 Quick Deploy from GitHub
 
-### Quick Deploy
+Your code is already on GitHub: **https://github.com/Manas2342/vibetune-music-**
 
-Run the deployment script:
-```bash
-./deploy.sh
-```
+Choose your deployment platform:
 
-Or follow these simple steps for Render.com (Recommended):
+#### **Option 1: Render.com** (Recommended - Free & Easy)
+1. Go to [render.com](https://render.com) and sign up
+2. Create new "Web Service" and connect your GitHub repo
+3. Set Root Directory: `vibetune4`
+4. Set Runtime: `Docker`
+5. Add environment variables (see [GITHUB_DEPLOYMENT.md](./GITHUB_DEPLOYMENT.md))
+6. Deploy! Get your live link: `https://your-app.onrender.com`
 
-1. Push code to GitHub
-2. Go to [render.com](https://render.com)
-3. Create new Web Service
-4. Connect your GitHub repository
-5. Add environment variables
-6. Deploy!
+#### **Option 2: Railway.app**
+1. Go to [railway.app](https://railway.app) and sign up
+2. Deploy from GitHub: `vibetune-music-`
+3. Set Root Directory: `vibetune4`
+4. Add environment variables
+5. Deploy! Get your live link: `https://your-app.up.railway.app`
+
+**For detailed instructions, see:**
+- [GITHUB_DEPLOYMENT.md](./GITHUB_DEPLOYMENT.md) - Quick start with GitHub
+- [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) - Comprehensive guide
+
+### 🔄 Auto-Deploy
+
+Both platforms support automatic deployment:
+- Push to `main` branch → Auto-deploys
+- No manual steps needed after initial setup!
 
 ## 🛠️ Tech Stack
 
