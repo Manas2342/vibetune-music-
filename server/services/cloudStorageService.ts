@@ -56,6 +56,11 @@ class CloudStorageService {
   }
 
   private initializeLocalStorage() {
+    // In Netlify Functions, use /tmp for writable directories
+    if (process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      this.localStoragePath = '/tmp/storage';
+    }
+    
     const dirs = [
       this.localStoragePath,
       path.join(this.localStoragePath, 'audio'),
@@ -63,10 +68,16 @@ class CloudStorageService {
       path.join(this.localStoragePath, 'metadata')
     ];
 
-    for (const dir of dirs) {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+    try {
+      for (const dir of dirs) {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
       }
+    } catch (error) {
+      console.warn('Could not create local storage directories, using cloud storage only:', error);
+      // In serverless, rely on S3 only
+      this.localStoragePath = '';
     }
   }
 

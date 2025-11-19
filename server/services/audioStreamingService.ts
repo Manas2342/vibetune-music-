@@ -47,9 +47,20 @@ class AudioStreamingService {
       });
     }
 
-    // Ensure local cache directory exists
-    if (!fs.existsSync(this.localCacheDir)) {
-      fs.mkdirSync(this.localCacheDir, { recursive: true });
+    // Ensure local cache directory exists (only if not in serverless environment)
+    // In Netlify Functions, use /tmp for writable directories
+    if (process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      this.localCacheDir = '/tmp/audio-cache';
+    }
+    
+    try {
+      if (!fs.existsSync(this.localCacheDir)) {
+        fs.mkdirSync(this.localCacheDir, { recursive: true });
+      }
+    } catch (error) {
+      console.warn('Could not create local cache directory, using in-memory cache only:', error);
+      // Disable local caching if directory creation fails
+      this.localCacheDir = '';
     }
   }
 

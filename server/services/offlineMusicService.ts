@@ -40,8 +40,19 @@ class OfflineMusicService {
   }
 
   private ensureDownloadDir(): void {
-    if (!fs.existsSync(this.downloadDir)) {
-      fs.mkdirSync(this.downloadDir, { recursive: true });
+    // In Netlify Functions, use /tmp for writable directories
+    if (process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      this.downloadDir = '/tmp/offline-music';
+    }
+    
+    try {
+      if (!fs.existsSync(this.downloadDir)) {
+        fs.mkdirSync(this.downloadDir, { recursive: true });
+      }
+    } catch (error) {
+      console.warn('Could not create download directory, offline downloads disabled:', error);
+      // Disable offline downloads if directory creation fails
+      this.downloadDir = '';
     }
   }
 

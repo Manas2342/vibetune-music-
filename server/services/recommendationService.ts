@@ -111,8 +111,17 @@ class RecommendationService {
   }
 
   private ensureDirectories() {
-    if (!fs.existsSync(this.profilesPath)) {
-      fs.mkdirSync(this.profilesPath, { recursive: true });
+    // In Netlify Functions, use /tmp for writable directories
+    if (process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      this.profilesPath = '/tmp/storage/user-profiles';
+    }
+    
+    try {
+      if (!fs.existsSync(this.profilesPath)) {
+        fs.mkdirSync(this.profilesPath, { recursive: true });
+      }
+    } catch (error) {
+      console.warn('Could not create profiles directory, using in-memory storage only:', error);
     }
   }
 

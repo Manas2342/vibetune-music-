@@ -67,11 +67,21 @@ class PlaylistService {
   }
 
   private ensureDirectories() {
+    // In Netlify Functions, use /tmp for writable directories
+    if (process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      this.playlistsPath = '/tmp/storage/playlists';
+      this.userPlaylistsPath = '/tmp/storage/user-playlists';
+    }
+    
     const dirs = [this.playlistsPath, this.userPlaylistsPath];
-    for (const dir of dirs) {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+    try {
+      for (const dir of dirs) {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
       }
+    } catch (error) {
+      console.warn('Could not create playlist directories, using in-memory storage only:', error);
     }
   }
 
