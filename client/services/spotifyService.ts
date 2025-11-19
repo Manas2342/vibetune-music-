@@ -51,17 +51,32 @@ class ClientSpotifyService {
     const params = new URLSearchParams({ code });
     if (state) params.append('state', state);
 
-    const response = await fetch(`${this.baseUrl}/auth/spotify/callback?${params}`, {
-      // Ensure server returns JSON instead of an HTML redirect
-      headers: { Accept: 'application/json' },
-    });
-    const authResponse = await this.handleResponse<AuthResponse>(response);
-    
-    // Store session token
-    this.sessionToken = authResponse.sessionToken;
-    localStorage.setItem('spotifySessionToken', authResponse.sessionToken);
-    
-    return authResponse;
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/spotify/callback?${params}`, {
+        // Ensure server returns JSON instead of an HTML redirect
+        headers: { Accept: 'application/json' },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
+        throw new Error(errorData.message || errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const authResponse = await this.handleResponse<AuthResponse>(response);
+      
+      // Store session token
+      this.sessionToken = authResponse.sessionToken;
+      localStorage.setItem('spotifySessionToken', authResponse.sessionToken);
+      
+      return authResponse;
+    } catch (error: any) {
+      console.error('❌ Error in handleCallback:', error);
+      // Re-throw with more context if it's a network error
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        throw new Error('Network error: Could not connect to the server. Make sure the server is running on http://127.0.0.1:8080');
+      }
+      throw error;
+    }
   }
 
   async refreshToken(): Promise<RefreshTokenResponse> {

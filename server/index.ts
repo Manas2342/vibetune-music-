@@ -96,7 +96,11 @@ export function createServer() {
   // Middleware
   app.use(cors({
     origin: process.env.NODE_ENV === 'production' ? 
-      ['https://www.vibetune.app'] :
+      [
+        'https://www.vibetune.app',
+        /^https:\/\/.*\.netlify\.app$/,
+        /^https:\/\/.*\.netlify\.dev$/
+      ] :
       ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080', 'http://127.0.0.1:8080'],
     credentials: true,
   }));

@@ -59,9 +59,28 @@ const SpotifyCallback = () => {
         }, 1500);
         }
 
-      } catch (error) {
-        console.error('Spotify callback error:', error);
-        setError(error instanceof Error ? error.message : 'Authentication failed');
+      } catch (error: any) {
+        console.error('❌ Spotify callback error:', error);
+        let errorMessage = 'Authentication failed';
+        
+        if (error instanceof Error) {
+          errorMessage = error.message;
+          
+          // Check for common errors
+          if (error.message.includes('HTTPS') || error.message.includes('SSL') || error.message.includes('certificate')) {
+            errorMessage = 'HTTPS Error: Please ensure your Spotify redirect URI is set to HTTP (not HTTPS) for local development. Check your Spotify Developer Dashboard settings.';
+          } else if (error.message.includes('redirect_uri_mismatch') || error.message.includes('redirect')) {
+            errorMessage = 'Redirect URI Mismatch: The redirect URI in your .env file must exactly match the one in your Spotify Developer Dashboard. Current: http://127.0.0.1:8080/callback';
+          } else if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+          } else if (error.response?.data?.error) {
+            errorMessage = error.response.data.error;
+          }
+        } else if (error?.message) {
+          errorMessage = error.message;
+        }
+        
+        setError(errorMessage);
         setStatus('error');
 
         // If this is in a popup, send error message to parent

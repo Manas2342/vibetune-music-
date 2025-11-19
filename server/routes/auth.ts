@@ -52,18 +52,38 @@ export const handleSpotifyCallback: RequestHandler = async (req, res) => {
     
     if (error) {
       console.error('Spotify OAuth error:', error);
+      // Check if client wants JSON response
+      const wantsJson = req.xhr || req.headers.accept?.includes('application/json');
+      if (wantsJson) {
+        return res.status(400).json({ 
+          error: 'spotify_auth_denied',
+          message: `Spotify authorization failed: ${error}` 
+        });
+      }
       return res.redirect('/?error=spotify_auth_denied');
     }
     
     if (!code) {
+      // Check if client wants JSON response
+      const wantsJson = req.xhr || req.headers.accept?.includes('application/json');
+      if (wantsJson) {
+        return res.status(400).json({ 
+          error: 'no_auth_code',
+          message: 'No authorization code received from Spotify' 
+        });
+      }
       return res.redirect('/?error=no_auth_code');
     }
     
+    console.log('🎵 Spotify callback received, exchanging code for token...');
+    
     // Exchange code for tokens
     const tokenResponse = await spotifyService.exchangeCodeForToken(code as string);
+    console.log('🎵 Token exchange successful');
 
     // Get user profile
     const userProfile = await spotifyService.getCurrentUser(tokenResponse.access_token);
+    console.log('🎵 User profile retrieved:', userProfile.display_name);
 
     // Create session
     const sessionId = authService.createSession(
@@ -71,9 +91,12 @@ export const handleSpotifyCallback: RequestHandler = async (req, res) => {
       tokenResponse.refresh_token || '',
       tokenResponse.expires_in
     );
+    console.log('🎵 Session created:', sessionId);
 
-    // If the request expects JSON (fetch/XHR), return JSON. Otherwise redirect for browser navigation.
+    // Check if client wants JSON response (from fetch/XHR calls)
     const wantsJson = req.xhr || req.headers.accept?.includes('application/json');
+    
+    // For API calls from client (fetch requests), always return JSON
     if (wantsJson) {
       return res.json({
         sessionToken: sessionId,
@@ -86,12 +109,23 @@ export const handleSpotifyCallback: RequestHandler = async (req, res) => {
       });
     }
 
+    // Fallback redirect (shouldn't normally be used)
     const redirectUrl = `/?sessionToken=${sessionId}&connected=spotify`;
     res.redirect(redirectUrl);
     
-  } catch (error) {
-    console.error('Error handling Spotify callback:', error);
-    res.redirect('/?error=spotify_connection_failed');
+  } catch (error: any) {
+    console.error('❌ Error handling Spotify callback:', error);
+    const errorMessage = error.response?.data?.error_description || error.message || 'Unknown error';
+    
+    // Check if client wants JSON response
+    const wantsJson = req.xhr || req.headers.accept?.includes('application/json');
+    if (wantsJson) {
+      return res.status(500).json({ 
+        error: 'spotify_connection_failed',
+        message: errorMessage 
+      });
+    }
+    res.redirect(`/?error=spotify_connection_failed&message=${encodeURIComponent(errorMessage)}`);
   }
 };
 
