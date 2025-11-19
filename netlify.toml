@@ -1,10 +1,11 @@
 [build]
-  command = "npm run build:client"
-  publish = "dist/spa"
-  functions = "netlify/functions"
+  command = "cd vibetune4 && npm ci && npm run build:client"
+  publish = "vibetune4/dist/spa"
+  functions = "vibetune4/netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
 
 [[redirects]]
   from = "/api/*"
