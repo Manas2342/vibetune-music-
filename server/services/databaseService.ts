@@ -22,14 +22,33 @@ interface LibraryStats {
 }
 
 class DatabaseService {
-  private db: Database.Database;
+  private db: Database.Database | null = null;
+  private dbPath: string;
 
   constructor() {
-    this.db = new Database.Database('./vibetune.db');
-    this.initializeTables();
+    // In Netlify Functions, use /tmp for writable database
+    if (process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      this.dbPath = '/tmp/vibetune.db';
+    } else {
+      this.dbPath = process.env.DATABASE_URL?.replace('sqlite:', '') || './vibetune.db';
+    }
+    
+    try {
+      this.db = new Database.Database(this.dbPath);
+      this.initializeTables();
+    } catch (error) {
+      console.error('Failed to initialize database:', error);
+      // In serverless, database might not be available - continue without it
+      // Some features will be limited but app won't crash
+    }
   }
 
   private initializeTables(): void {
+    if (!this.db) {
+      console.warn('Database not available, skipping table initialization');
+      return;
+    }
+    
     // Create users table
     this.db.run(`
       CREATE TABLE IF NOT EXISTS users (
@@ -114,8 +133,13 @@ class DatabaseService {
 
   // User management
   async createUser(userData: any): Promise<void> {
+    if (!this.db) {
+      console.warn('Database not available, skipping user creation');
+      return Promise.resolve();
+    }
+    
     return new Promise((resolve, reject) => {
-      const stmt = this.db.prepare(`
+      const stmt = this.db!.prepare(`
         INSERT OR REPLACE INTO users (
           id, spotify_id, display_name, email, country, product, image_url,
           access_token, refresh_token, token_expires_at, updated_at
@@ -143,8 +167,12 @@ class DatabaseService {
   }
 
   async getUser(userId: string): Promise<any> {
+    if (!this.db) {
+      return Promise.resolve(null);
+    }
+    
     return new Promise((resolve, reject) => {
-      this.db.get(
+      this.db!.get(
         'SELECT * FROM users WHERE id = ?',
         [userId],
         (err, row) => {
@@ -157,13 +185,16 @@ class DatabaseService {
 
   // Library synchronization
   async syncUserLibrary(userId: string, libraryItems: UserLibrary[]): Promise<void> {
+    if (!this.db) return Promise.resolve();
     const promises = libraryItems.map(item => this.addLibraryItem(userId, item));
     await Promise.all(promises);
   }
 
   async addLibraryItem(userId: string, item: Omit<UserLibrary, 'userId'>): Promise<void> {
+    if (!this.db) return Promise.resolve();
+    
     return new Promise((resolve, reject) => {
-      const stmt = this.db.prepare(`
+      const stmt = this.db!.prepare(`
         INSERT OR REPLACE INTO user_library (
           id, user_id, spotify_id, name, type, data, is_offline, download_path
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -188,6 +219,8 @@ class DatabaseService {
   }
 
   async getUserLibrary(userId: string, type?: string): Promise<UserLibrary[]> {
+    if (!this.db) return Promise.resolve([]);
+    
     return new Promise((resolve, reject) => {
       const query = type 
         ? 'SELECT * FROM user_library WHERE user_id = ? AND type = ? ORDER BY synced_at DESC'
@@ -195,7 +228,7 @@ class DatabaseService {
       
       const params = type ? [userId, type] : [userId];
 
-      this.db.all(query, params, (err, rows: any[]) => {
+      this.db!.all(query, params, (err, rows: any[]) => {
         if (err) reject(err);
         else {
           const libraryItems = rows.map(row => ({
@@ -216,8 +249,17 @@ class DatabaseService {
   }
 
   async getLibraryStats(userId: string): Promise<LibraryStats> {
+    if (!this.db) {
+      return Promise.resolve({
+        totalTracks: 0,
+        totalPlaylists: 0,
+        totalAlbums: 0,
+        offlineTracks: 0
+      });
+    }
+    
     return new Promise((resolve, reject) => {
-      this.db.all(`
+      this.db!.all(`
         SELECT 
           type,
           COUNT(*) as count,
@@ -263,8 +305,10 @@ class DatabaseService {
 
   // Analytics
   async recordPlayback(userId: string, trackData: any, durationMs?: number, completed?: boolean): Promise<void> {
+    if (!this.db) return Promise.resolve();
+    
     return new Promise((resolve, reject) => {
-      const stmt = this.db.prepare(`
+      const stmt = this.db!.prepare(`
         INSERT INTO listening_analytics (
           id, user_id, track_id, track_name, artist_name, album_name, 
           duration_ms, completed
@@ -292,6 +336,8 @@ class DatabaseService {
   }
 
   async getListeningStats(userId: string, timeframe: 'week' | 'month' | 'year' = 'month'): Promise<any> {
+    if (!this.db) return Promise.resolve([]);
+    
     return new Promise((resolve, reject) => {
       let dateCondition = '';
       switch (timeframe) {
@@ -306,7 +352,7 @@ class DatabaseService {
           break;
       }
 
-      this.db.all(`
+      this.db!.all(`
         SELECT 
           track_name,
           artist_name,
@@ -328,9 +374,11 @@ class DatabaseService {
 
   // Social features
   async followUser(followerId: string, followingId: string): Promise<void> {
+    if (!this.db) return Promise.resolve();
+    
     return new Promise((resolve, reject) => {
       const followId = `follow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const stmt = this.db.prepare(`
+      const stmt = this.db!.prepare(`
         INSERT OR IGNORE INTO user_follows (id, follower_id, following_id) 
         VALUES (?, ?, ?)
       `);
@@ -345,8 +393,10 @@ class DatabaseService {
   }
 
   async unfollowUser(followerId: string, followingId: string): Promise<void> {
+    if (!this.db) return Promise.resolve();
+    
     return new Promise((resolve, reject) => {
-      this.db.run(
+      this.db!.run(
         'DELETE FROM user_follows WHERE follower_id = ? AND following_id = ?',
         [followerId, followingId],
         function(err) {
@@ -358,8 +408,10 @@ class DatabaseService {
   }
 
   async getUserFollowing(userId: string): Promise<any[]> {
+    if (!this.db) return Promise.resolve([]);
+    
     return new Promise((resolve, reject) => {
-      this.db.all(`
+      this.db!.all(`
         SELECT u.*, uf.followed_at
         FROM user_follows uf
         JOIN users u ON u.id = uf.following_id
@@ -373,8 +425,10 @@ class DatabaseService {
   }
 
   async getUserFollowers(userId: string): Promise<any[]> {
+    if (!this.db) return Promise.resolve([]);
+    
     return new Promise((resolve, reject) => {
-      this.db.all(`
+      this.db!.all(`
         SELECT u.*, uf.followed_at
         FROM user_follows uf
         JOIN users u ON u.id = uf.follower_id
@@ -388,9 +442,11 @@ class DatabaseService {
   }
 
   async recordActivity(userId: string, activityType: string, data: any): Promise<void> {
+    if (!this.db) return Promise.resolve();
+    
     return new Promise((resolve, reject) => {
       const activityId = `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const stmt = this.db.prepare(`
+      const stmt = this.db!.prepare(`
         INSERT INTO activity_feed (
           id, user_id, activity_type, track_id, playlist_id, activity_data
         ) VALUES (?, ?, ?, ?, ?, ?)
@@ -413,8 +469,10 @@ class DatabaseService {
   }
 
   async getActivityFeed(userId: string, limit: number = 50): Promise<any[]> {
+    if (!this.db) return Promise.resolve([]);
+    
     return new Promise((resolve, reject) => {
-      this.db.all(`
+      this.db!.all(`
         SELECT af.*, u.display_name, u.image_url
         FROM activity_feed af
         JOIN users u ON u.id = af.user_id
@@ -438,7 +496,9 @@ class DatabaseService {
   }
 
   close(): void {
-    this.db.close();
+    if (this.db) {
+      this.db.close();
+    }
   }
 }
 
