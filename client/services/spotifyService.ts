@@ -111,7 +111,8 @@ class ClientSpotifyService {
     query: string,
     type: string = 'track,album,artist,playlist',
     limit: number = 20,
-    offset: number = 0
+    offset: number = 0,
+    market?: string
   ): Promise<SpotifySearchResults> {
     const params = new URLSearchParams({
       q: query,
@@ -119,6 +120,7 @@ class ClientSpotifyService {
       limit: limit.toString(),
       offset: offset.toString(),
     });
+    if (market) params.append('market', market);
 
     const response = await fetch(`${this.baseUrl}/spotify/search?${params}`, {
       headers: this.getHeaders(),

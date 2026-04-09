@@ -10,7 +10,7 @@ import {
   Music,
   Camera,
   Users,
-  BarChart3,
+  Sparkles,
   TrendingUp,
   Share2,
   Zap,
@@ -36,7 +36,7 @@ const playlistItems = [
 const featuresItems = [
   { icon: TrendingUp, label: "Trending", href: "/trending" },
   { icon: UserSearch, label: "Artist Discovery", href: "/artists" },
-  { icon: BarChart3, label: "Analytics", href: "/analytics" },
+  { icon: Sparkles, label: "Discover", href: "/discover" },
   { icon: Share2, label: "Social", href: "/social" },
   { icon: Camera, label: "Webcam Studio", href: "/webcam" },
   { icon: Users, label: "Face Profiles", href: "/face-profiles" },

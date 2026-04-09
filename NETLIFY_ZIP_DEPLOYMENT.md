@@ -234,3 +234,5 @@ Your app should now be live on Netlify with full Spotify integration!
 - Make sure redirect URIs match exactly
 - Check browser console for client-side errors
 
+
+

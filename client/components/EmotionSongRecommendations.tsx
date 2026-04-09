@@ -283,7 +283,10 @@ export function EmotionSongRecommendations({ emotion, className }: EmotionSongRe
                         spotifyId: t.id,
                         previewUrl: t.preview_url,
                         isSpotifyTrack: true,
-                        quality: 'high'
+                        quality: 'high',
+                        // Keep each mood preview playing for 10 seconds,
+                        // then pause so users can evaluate and choose calmly.
+                        previewStopAfterMs: 10000
                       });
                     }}
                     className="bg-vibetune-green hover:bg-vibetune-green-dark text-black"

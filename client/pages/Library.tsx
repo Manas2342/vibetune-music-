@@ -32,7 +32,7 @@ export default function Library() {
   const [showArtistSearch, setShowArtistSearch] = useState(false);
   
   const navigate = useNavigate();
-  const { playTrack } = useMusicPlayer();
+  const { playTrack, currentTrack, togglePlayPause } = useMusicPlayer();
   const { toggleLike, isLiked } = useLibrary();
   const { toast } = useToast();
 
@@ -91,10 +91,28 @@ export default function Library() {
 
   const handlePlay = async (track: any) => {
     try {
-      await playTrack(track);
+      const normalizedTrack = {
+        id: track.id,
+        title: track.title || track.name,
+        artist: track.artist || (track.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist'),
+        albumArt: track.albumArt || track.album?.images?.[0]?.url || '',
+        duration: track.duration || track.duration_ms || 0,
+        url: track.url || track.preview_url || track.external_urls?.spotify || '',
+        spotifyId: track.spotifyId || track.id,
+        previewUrl: track.previewUrl || track.preview_url,
+        isSpotifyTrack: track.isSpotifyTrack ?? true,
+        quality: track.quality || 'high',
+      };
+
+      if (currentTrack?.id === normalizedTrack.id) {
+        togglePlayPause();
+        return;
+      }
+
+      await playTrack(normalizedTrack);
       toast({
         title: "🎵 Playing",
-        description: `Now playing "${track.name}"`,
+        description: `Now playing "${normalizedTrack.title}"`,
       });
     } catch (error) {
       console.error('Error playing track:', error);

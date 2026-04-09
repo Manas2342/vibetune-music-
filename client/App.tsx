@@ -6,6 +6,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { MusicPlayer } from "@/components/MusicPlayer";
@@ -20,17 +21,19 @@ import Playlist from "./pages/Playlist";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Profile from "./pages/Profile";
-import WebcamDemo from "./pages/WebcamDemo";
 import CameraTest from "./pages/CameraTest";
-import FaceRecognitionProfiles from "./pages/FaceRecognitionProfiles";
 import SpotifyCallback from "./pages/SpotifyCallback";
-import Analytics from "./pages/Analytics";
-import Social from "./pages/Social";
 import LikedSongs from "./pages/LikedSongs";
 import CreatePlaylist from "./pages/CreatePlaylist";
 import Artist from "./pages/Artist";
-import Trending from "./pages/Trending";
-import ArtistDiscovery from "./pages/ArtistDiscovery";
+import Downloaded from "./pages/Downloaded";
+
+const WebcamDemo = lazy(() => import("./pages/WebcamDemo"));
+const FaceRecognitionProfiles = lazy(() => import("./pages/FaceRecognitionProfiles"));
+const Discover = lazy(() => import("./pages/Discover"));
+const Social = lazy(() => import("./pages/Social"));
+const Trending = lazy(() => import("./pages/Trending"));
+const ArtistDiscovery = lazy(() => import("./pages/ArtistDiscovery"));
 
 const queryClient = new QueryClient();
 
@@ -50,7 +53,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 flex flex-col">
           <TopBar />
           <main className="flex-1 overflow-y-auto pb-24">
-            {children}
+            <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
           </main>
         </div>
       </div>
@@ -179,18 +182,19 @@ function MainApp() {
         path="/downloaded"
         element={
           <Layout>
-            <Playlist />
+            <Downloaded />
           </Layout>
         }
       />
       <Route
-        path="/analytics"
+        path="/discover"
         element={
           <Layout>
-            <Analytics />
+            <Discover />
           </Layout>
         }
       />
+      <Route path="/analytics" element={<Navigate to="/discover" replace />} />
       <Route
         path="/social"
         element={

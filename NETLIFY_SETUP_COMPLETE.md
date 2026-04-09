@@ -187,3 +187,5 @@ Your app is now live with Spotify integration!
 **Spotify Dashboard:** [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)  
 **Netlify Dashboard:** [app.netlify.com](https://app.netlify.com)
 
+
+

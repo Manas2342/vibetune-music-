@@ -1,15 +1,36 @@
 import { useParams } from "react-router-dom";
-import { Play, Heart, MoreHorizontal, Clock } from "lucide-react";
+import { Play, Heart, MoreHorizontal, Clock, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import spotifyService from "@/services/spotifyService";
 import { useMusicPlayer } from "@/contexts/EnhancedMusicPlayerContext";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Playlist() {
   const { id } = useParams();
   const [playlist, setPlaylist] = useState<any | null>(null);
   const [tracks, setTracks] = useState<any[]>([]);
-  const { playTrack } = useMusicPlayer();
+  const { playTrack, currentTrack, togglePlayPause } = useMusicPlayer();
+  const { toast } = useToast();
+
+  const handlePlayTrack = async (track: any) => {
+    if (currentTrack?.id === track.id) {
+      togglePlayPause();
+      return;
+    }
+    await playTrack({
+      id: track.id,
+      title: track.name,
+      artist: (track.artists || []).map((a: any) => a.name).join(', '),
+      albumArt: track.album?.images?.[0]?.url || '',
+      duration: track.duration_ms,
+      url: track.preview_url || track.external_urls?.spotify || '',
+      spotifyId: track.id,
+      previewUrl: track.preview_url,
+      isSpotifyTrack: true,
+      quality: 'high'
+    });
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -25,6 +46,57 @@ export default function Playlist() {
     };
     load();
   }, [id]);
+
+  const handleDownloadTrack = async (track: any) => {
+    const sessionToken = localStorage.getItem("spotifySessionToken");
+    if (!sessionToken) {
+      toast({
+        title: "Spotify not connected",
+        description: "Please connect Spotify first to download tracks.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!track.preview_url) {
+      toast({
+        title: "Download unavailable",
+        description: "This track has no preview audio URL from Spotify.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/offline/download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({
+          trackId: track.id,
+          trackName: track.name,
+          artistName: (track.artists || []).map((a: any) => a.name).join(", "),
+          audioUrl: track.preview_url,
+          quality: "high",
+          format: "mp3",
+        }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      toast({
+        title: "Download started",
+        description: `${track.name} is being saved offline.`,
+      });
+    } catch (error) {
+      console.error("Failed to start download:", error);
+      toast({
+        title: "Download failed",
+        description: "Could not start download. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div>
@@ -88,18 +160,7 @@ export default function Playlist() {
               key={track.id || index}
               className="grid grid-cols-[16px_6fr_4fr_3fr_minmax(120px,1fr)] gap-4 px-4 py-2 text-sm hover:bg-vibetune-gray/20 rounded-md group cursor-pointer"
               onClick={async () => {
-                await playTrack({
-                  id: track.id,
-                  title: track.name,
-                  artist: (track.artists || []).map((a: any) => a.name).join(', '),
-                  albumArt: track.album?.images?.[0]?.url || '',
-                  duration: track.duration_ms,
-                  url: track.preview_url || track.external_urls?.spotify || '',
-                  spotifyId: track.id,
-                  previewUrl: track.preview_url,
-                  isSpotifyTrack: true,
-                  quality: 'high'
-                });
+                await handlePlayTrack(track);
               }}
             >
               <div className="flex items-center text-vibetune-text-muted">
@@ -124,6 +185,18 @@ export default function Playlist() {
               </div>
               
               <div className="flex items-center justify-end space-x-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="opacity-0 group-hover:opacity-100 w-8 h-8 p-0 text-vibetune-text-muted hover:text-vibetune-green"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownloadTrack(track);
+                  }}
+                  title={track.preview_url ? "Download for offline" : "No preview URL available"}
+                >
+                  <Download className="w-4 h-4" />
+                </Button>
                 <span className="text-vibetune-text-muted">{durationMin}:{durationSec}</span>
                 <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 w-8 h-8 p-0">
                   <MoreHorizontal className="w-4 h-4 text-vibetune-text-muted" />

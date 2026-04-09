@@ -7,13 +7,17 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function LikedSongs() {
   const { likedSongs, toggleLike, isLiked } = useLibrary();
-  const { playTrack, currentTrack, isPlaying } = useMusicPlayer();
+  const { playTrack, currentTrack, isPlaying, togglePlayPause } = useMusicPlayer();
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handlePlay = async (track: any) => {
     if (playTrack) {
       try {
+        if (currentTrack?.id === track.id) {
+          togglePlayPause();
+          return;
+        }
         await playTrack({
           id: track.id,
           title: track.title,

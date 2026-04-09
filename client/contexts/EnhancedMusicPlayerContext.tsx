@@ -24,6 +24,8 @@ export interface Track {
   isSpotifyTrack?: boolean;
   quality?: 'high' | 'medium' | 'low';
   cached?: boolean;
+  // Optional preview guard for UI flows like emotion recommendations.
+  previewStopAfterMs?: number;
 }
 
 interface MusicPlayerContextType {
@@ -99,6 +101,7 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
   const [volume, setVolumeState] = useState(75);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [playbackSource, setPlaybackSource] = useState<'audio' | 'spotify' | null>(null);
   
   // Queue management
   const [queue, setQueue] = useState<Track[]>([]);
@@ -111,19 +114,36 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
   const [spotifyPlayer, setSpotifyPlayer] = useState<any>(null);
   const [isSpotifyConnected, setIsSpotifyConnected] = useState(false);
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  const deviceIdRef = useRef<string | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
   const connectSpotifyRef = useRef<null | (() => Promise<void>)>(null);
+  const spotifyPlaybackIntentRef = useRef(false);
+  const playbackSourceRef = useRef<'audio' | 'spotify' | null>(null);
   
   // Analytics
   const [playCount, setPlayCount] = useState(new Map<string, number>());
   const [lastPlayed, setLastPlayed] = useState(new Map<string, Date>());
+  const currentTrackIdRef = useRef<string | null>(null);
   
   // Audio refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
+  const previewStopTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Progress calculation
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  useEffect(() => {
+    playbackSourceRef.current = playbackSource;
+  }, [playbackSource]);
+
+  useEffect(() => {
+    currentTrackIdRef.current = currentTrack?.id || null;
+  }, [currentTrack?.id]);
+
+  useEffect(() => {
+    deviceIdRef.current = deviceId;
+  }, [deviceId]);
 
   // Navigation helpers
   const canPlayNext = currentIndex < queue.length - 1 || repeatMode === 'playlist';
@@ -138,7 +158,11 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
       const audio = audioRef.current;
 
       const handleLoadedMetadata = () => {
-        setDuration(audio.duration * 1000);
+        if (Number.isFinite(audio.duration) && audio.duration > 0) {
+          setDuration(audio.duration * 1000);
+        } else if (currentTrack?.duration) {
+          setDuration(currentTrack.duration);
+        }
       };
 
       const handleTimeUpdate = () => {
@@ -183,7 +207,7 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
         audio.src = '';
       };
     }
-  }, []);
+  }, [currentTrack?.duration]);
 
   // Volume control
   useEffect(() => {
@@ -194,6 +218,34 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
       spotifyPlayer.setVolume(volume / 100);
     }
   }, [volume, spotifyPlayer]);
+
+  // Smoothly update Spotify timeline between SDK state events
+  useEffect(() => {
+    if (!spotifyPlayer || playbackSource !== 'spotify' || !isPlaying) return;
+
+    if (progressInterval.current) {
+      clearInterval(progressInterval.current);
+    }
+
+    progressInterval.current = setInterval(async () => {
+      try {
+        const state = await spotifyPlayer.getCurrentState?.();
+        if (state) {
+          setCurrentTime(state.position || 0);
+          setDuration(state.duration || currentTrack?.duration || 0);
+        }
+      } catch {
+        // Ignore transient polling errors from Spotify SDK
+      }
+    }, 1000);
+
+    return () => {
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+        progressInterval.current = null;
+      }
+    };
+  }, [spotifyPlayer, playbackSource, isPlaying, currentTrack?.duration]);
 
   // Initialize Spotify SDK
   useEffect(() => {
@@ -223,23 +275,66 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
   }, [sdkReady, spotifyPlayer]);
 
   // Transfer playback to this web player device
+  const refreshSpotifyAccessToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const sessionToken = localStorage.getItem('spotifySessionToken');
+      if (!sessionToken) return null;
+      const res = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${sessionToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data?.accessToken) {
+        localStorage.setItem('spotify_access_token', data.accessToken);
+        return data.accessToken;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const getValidSpotifyToken = useCallback(async (): Promise<string | null> => {
+    const token = localStorage.getItem('spotify_access_token');
+    if (token) return token;
+    return refreshSpotifyAccessToken();
+  }, [refreshSpotifyAccessToken]);
+
   const transferPlaybackToDevice = useCallback(async () => {
     try {
-      if (!deviceId) return;
-      const token = localStorage.getItem('spotify_access_token');
+      const id = deviceIdRef.current ?? deviceId;
+      if (!id) return;
+      let token = await getValidSpotifyToken();
       if (!token) return;
-      await fetch('https://api.spotify.com/v1/me/player', {
+      let response = await fetch('https://api.spotify.com/v1/me/player', {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ device_ids: [deviceId], play: false })
+        body: JSON.stringify({ device_ids: [id], play: false })
       });
+      if (response.status === 401) {
+        const refreshed = await refreshSpotifyAccessToken();
+        if (!refreshed) return;
+        token = refreshed;
+        response = await fetch('https://api.spotify.com/v1/me/player', {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ device_ids: [id], play: false }),
+        });
+      }
     } catch (e) {
       console.warn('Transfer playback failed', e);
     }
-  }, [deviceId]);
+  }, [deviceId, getValidSpotifyToken, refreshSpotifyAccessToken]);
 
   // (ensureSpotifyReady is defined after connectSpotify)
 
@@ -325,7 +420,7 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
       console.error('Error getting audio stream URL:', error);
       return null;
     }
-  }, []);
+  }, [spotifyPlayer, deviceId]);
 
   // Create demo audio for tracks without preview URLs
   const createDemoAudio = useCallback((track: Track) => {
@@ -388,6 +483,16 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
   const playAudioStream = useCallback(async (track: Track, streamUrl: string) => {
     if (audioRef.current) {
       console.log('🎵 Loading audio:', streamUrl);
+      setPlaybackSource('audio');
+      setCurrentTime(0);
+      setDuration(track.duration || 0);
+      if (spotifyPlayer && isSpotifyConnected) {
+        try {
+          await spotifyPlayer.pause();
+        } catch {
+          // Keep audio playback as primary even if Spotify pause fails
+        }
+      }
       audioRef.current.src = streamUrl;
       audioRef.current.load();
 
@@ -422,13 +527,17 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
 
       await playAudio();
     }
-  }, []);
+  }, [spotifyPlayer, isSpotifyConnected]);
 
   // Play track
   const playTrack = useCallback(async (track: Track) => {
     try {
       setIsLoading(true);
       setCurrentTrack(track);
+      if (previewStopTimerRef.current) {
+        clearTimeout(previewStopTimerRef.current);
+        previewStopTimerRef.current = null;
+      }
 
       // Show development mode notice for preview tracks
       if (track.previewUrl) {
@@ -459,7 +568,7 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
               console.log('🎵 Using Spotify Web Playback SDK for full audio:', streamUrl);
               
               // Ensure Spotify Web Playback SDK is ready
-              const token = localStorage.getItem('spotify_access_token');
+              let token = await getValidSpotifyToken();
               if (!token) {
                 throw new Error('No Spotify access token found');
               }
@@ -471,12 +580,14 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
               }
               
               const ready = await ensureSpotifyReady();
-              if (ready && deviceId) {
-                console.log('🎵 Transferring playback to device:', deviceId);
+              const activeDeviceId = deviceIdRef.current ?? deviceId;
+              if (ready && activeDeviceId) {
+                console.log('🎵 Transferring playback to device:', activeDeviceId);
                 await transferPlaybackToDevice();
                 
                 console.log('🎵 Starting playback...');
-                const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+                spotifyPlaybackIntentRef.current = true;
+                let response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${activeDeviceId}`, {
                   method: 'PUT',
                   headers: {
                     'Authorization': `Bearer ${token}`,
@@ -486,13 +597,52 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
                     uris: [streamUrl]
                   }),
                 });
+                if (response.status === 401) {
+                  const refreshed = await refreshSpotifyAccessToken();
+                  if (refreshed) {
+                    token = refreshed;
+                    response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${activeDeviceId}`, {
+                      method: 'PUT',
+                      headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        uris: [streamUrl]
+                      }),
+                    });
+                  }
+                }
                 
                 if (response.ok) {
+                  if (audioRef.current) {
+                    audioRef.current.pause();
+                  }
+                  setPlaybackSource('spotify');
+                  setCurrentTime(0);
+                  setDuration(track.duration || 0);
                   setIsPlaying(true);
                   console.log('✅ Spotify Web Playback SDK playing successfully');
                   
                   if (typeof window !== 'undefined' && 'toast' in window) {
                     (window as any).toast?.success?.(`🎵 Now playing full track: ${track.title}`);
+                  }
+                  if (track.previewStopAfterMs && track.previewStopAfterMs > 0) {
+                    previewStopTimerRef.current = setTimeout(async () => {
+                      if (currentTrackIdRef.current === track.id) {
+                        try {
+                          if (playbackSourceRef.current === 'spotify' && spotifyPlayer) {
+                            await spotifyPlayer.pause();
+                          } else if (audioRef.current) {
+                            audioRef.current.pause();
+                          }
+                        } catch {
+                          // Ignore pause timing edge cases
+                        } finally {
+                          setIsPlaying(false);
+                        }
+                      }
+                    }, track.previewStopAfterMs);
                   }
                 } else {
                   const errorData = await response.text();
@@ -504,6 +654,7 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
               }
             } catch (spotifyError) {
               console.error('Spotify Web Playback SDK failed:', spotifyError);
+              spotifyPlaybackIntentRef.current = false;
               console.log('🎵 Falling back to preview URL or demo audio...');
               
               // Try to get preview URL as fallback
@@ -530,6 +681,23 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
           } else if (streamUrl) {
             // Use regular audio streaming (preview URLs or other sources)
             await playAudioStream(track, streamUrl);
+            if (track.previewStopAfterMs && track.previewStopAfterMs > 0) {
+              previewStopTimerRef.current = setTimeout(async () => {
+                if (currentTrackIdRef.current === track.id) {
+                  try {
+                    if (playbackSourceRef.current === 'spotify' && spotifyPlayer) {
+                      await spotifyPlayer.pause();
+                    } else if (audioRef.current) {
+                      audioRef.current.pause();
+                    }
+                  } catch {
+                    // Ignore pause timing edge cases
+                  } finally {
+                    setIsPlaying(false);
+                  }
+                }
+              }, track.previewStopAfterMs);
+            }
           } else {
             // No audio source available - show message and skip
             console.log('⚠️ No audio source available for:', track.title);
@@ -561,17 +729,22 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
     } finally {
       setIsLoading(false);
     }
-  }, [queue, spotifyPlayer, isSpotifyConnected, deviceId, playCount, getAudioStreamUrl]);
+  }, [queue, spotifyPlayer, isSpotifyConnected, deviceId, playCount, getAudioStreamUrl, getValidSpotifyToken, refreshSpotifyAccessToken, playAudioStream]);
 
   // Play/Pause controls
   const play = useCallback(async () => {
     try {
       console.log('▶️ Play button clicked - isSpotifyConnected:', isSpotifyConnected, 'spotifyPlayer:', !!spotifyPlayer, 'audioRef:', !!audioRef.current);
       
-      if (isSpotifyConnected && spotifyPlayer) {
+      if (playbackSource === 'spotify' && isSpotifyConnected && spotifyPlayer && currentTrack) {
         console.log('▶️ Resuming Spotify player');
         await spotifyPlayer.resume();
-        setIsPlaying(true);
+        const state = await spotifyPlayer.getCurrentState?.();
+        if (!state || state.paused) {
+          await playTrack(currentTrack);
+        } else {
+          setIsPlaying(true);
+        }
       } else if (audioRef.current) {
         // Handle case where audio source might not be loaded yet
         if (!audioRef.current.src && currentTrack) {
@@ -596,13 +769,13 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
       }
       setIsPlaying(false);
     }
-  }, [isSpotifyConnected, spotifyPlayer, currentTrack, playTrack]);
+  }, [playbackSource, isSpotifyConnected, spotifyPlayer, currentTrack, playTrack]);
 
   const pause = useCallback(async () => {
     try {
       console.log('⏸️ Pause button clicked - isSpotifyConnected:', isSpotifyConnected, 'spotifyPlayer:', !!spotifyPlayer, 'audioRef:', !!audioRef.current);
       
-      if (isSpotifyConnected && spotifyPlayer) {
+      if (playbackSource === 'spotify' && isSpotifyConnected && spotifyPlayer) {
         console.log('⏸️ Pausing Spotify player');
         await spotifyPlayer.pause();
       } else if (audioRef.current) {
@@ -613,12 +786,16 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
         console.log('⏸️ No audio element found to pause');
       }
       setIsPlaying(false);
+      if (previewStopTimerRef.current) {
+        clearTimeout(previewStopTimerRef.current);
+        previewStopTimerRef.current = null;
+      }
       console.log('⏸️ Set isPlaying to false');
     } catch (error) {
       console.error('Pause failed:', error);
       setIsPlaying(false);
     }
-  }, [isSpotifyConnected, spotifyPlayer]);
+  }, [playbackSource, isSpotifyConnected, spotifyPlayer]);
 
   const togglePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -632,14 +809,14 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
   const seekTo = useCallback(async (time: number) => {
     const seekTime = time / 1000; // Convert to seconds
     
-    if (isSpotifyConnected && spotifyPlayer) {
+    if (playbackSource === 'spotify' && isSpotifyConnected && spotifyPlayer) {
       await spotifyPlayer.seek(time);
     } else if (audioRef.current) {
       audioRef.current.currentTime = seekTime;
     }
     
     setCurrentTime(time);
-  }, [isSpotifyConnected, spotifyPlayer]);
+  }, [playbackSource, isSpotifyConnected, spotifyPlayer]);
 
   // Volume control
   const setVolume = useCallback((newVolume: number) => {
@@ -791,7 +968,7 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
       const player = new window.Spotify.Player({
         name: 'VibeTune Web Player',
         getOAuthToken: (cb: (token: string) => void) => {
-          cb(token);
+          cb(localStorage.getItem('spotify_access_token') || '');
         },
         volume: volume / 100,
       });
@@ -799,6 +976,7 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
       // Player event listeners
       player.addListener('ready', ({ device_id }: { device_id: string }) => {
         console.log('Spotify player ready with Device ID:', device_id);
+        deviceIdRef.current = device_id;
         setDeviceId(device_id);
         setIsSpotifyConnected(true);
         setSpotifyPlayer(player);
@@ -811,6 +989,10 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
 
       player.addListener('player_state_changed', (state: any) => {
         if (!state) return;
+        // Ignore passive Spotify events while HTML audio source is active.
+        if (playbackSourceRef.current === 'audio' && !spotifyPlaybackIntentRef.current) {
+          return;
+        }
 
         const track = state.track_window.current_track;
         if (track && currentTrack?.spotifyId !== track.id) {
@@ -829,6 +1011,10 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
         setCurrentTime(state.position);
         setDuration(state.duration);
         setIsPlaying(!state.paused);
+        if (spotifyPlaybackIntentRef.current || playbackSourceRef.current !== 'audio') {
+          setPlaybackSource('spotify');
+          spotifyPlaybackIntentRef.current = false;
+        }
       });
 
       // Connect to player
@@ -849,6 +1035,7 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
       spotifyPlayer.disconnect();
       setSpotifyPlayer(null);
       setIsSpotifyConnected(false);
+      deviceIdRef.current = null;
       setDeviceId(null);
     }
   }, [spotifyPlayer]);
@@ -862,10 +1049,10 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
         await connectSpotifyRef.current();
       }
       const start = Date.now();
-      while (!deviceId && Date.now() - start < 3000) {
+      while (!deviceIdRef.current && Date.now() - start < 8000) {
         await new Promise(r => setTimeout(r, 100));
       }
-      if (deviceId) {
+      if (deviceIdRef.current) {
         await transferPlaybackToDevice();
         return true;
       }
@@ -873,7 +1060,7 @@ export const MusicPlayerProvider: React.FC<MusicPlayerProviderProps> = ({ childr
     } catch {
       return false;
     }
-  }, [spotifyPlayer, deviceId, connectSpotify, transferPlaybackToDevice]);
+  }, [spotifyPlayer, connectSpotify, transferPlaybackToDevice]);
 
   // Load saved settings
   useEffect(() => {

@@ -6,7 +6,7 @@ import { AuthenticatedRequest, optionalAuthenticate } from '../middleware/auth';
 // Search for music content (using YouTube but presented as Spotify)
 export const search: RequestHandler = async (req: AuthenticatedRequest, res) => {
   try {
-    const { q, type = 'track,album,artist,playlist', limit = 20, offset = 0 } = req.query;
+    const { q, type = 'track,album,artist,playlist', limit = 20, offset = 0, market } = req.query;
 
     if (!q) {
       return res.status(400).json({ error: 'Search query is required' });
@@ -24,7 +24,8 @@ export const search: RequestHandler = async (req: AuthenticatedRequest, res) => 
       type as string,
       accessToken,
       Number(limit),
-      Number(offset)
+      Number(offset),
+      market as string | undefined
     );
 
     res.json(results);
@@ -420,9 +421,10 @@ export const getTopArtists: RequestHandler = async (req: AuthenticatedRequest, r
       accessToken = clientToken.access_token;
     }
     
-    // Search for popular artists
+    // Search for popular artists using a broad genre query.
+    // `year:2024` with type=artist can return empty results.
     const searchResults = await spotifyService.search(
-      'year:2024',
+      'genre:pop',
       'artist',
       accessToken,
       Number(limit),
@@ -470,8 +472,6 @@ export const getFeaturedPlaylists: RequestHandler = async (req: AuthenticatedReq
       accessToken = clientToken.access_token;
     }
     
-    console.log('🎵 Attempting to get featured playlists from Spotify...');
-    
     try {
       // Try to get featured playlists first
       const playlists = await spotifyService.getFeaturedPlaylists(
@@ -479,15 +479,16 @@ export const getFeaturedPlaylists: RequestHandler = async (req: AuthenticatedReq
         Number(limit),
         Number(offset)
       );
-      console.log('✅ Successfully got featured playlists from Spotify:', playlists?.playlists?.items?.length || 0, 'items');
       res.json(playlists);
     } catch (featuredError) {
-      console.error('❌ Featured playlists API failed:', featuredError.response?.status, featuredError.response?.statusText);
-      console.error('❌ Error details:', featuredError.response?.data);
+      const status = featuredError?.response?.status;
+      // Featured playlists can be unavailable for some app/account states; keep logs quiet.
+      if (status && status !== 404) {
+        console.warn('Featured playlists unavailable, using fallback:', status, featuredError.response?.statusText);
+      }
       
       // Try to get new releases as fallback (albums can act as playlists)
       try {
-        console.log('🎵 Trying new releases as playlist fallback...');
         const newReleases = await spotifyService.getNewReleases(accessToken, Number(limit), Number(offset));
         if (newReleases?.albums?.items?.length > 0) {
           // Transform albums to look like playlists
@@ -510,15 +511,13 @@ export const getFeaturedPlaylists: RequestHandler = async (req: AuthenticatedReq
             }
           };
           
-          console.log('✅ Successfully got new releases as playlist fallback:', playlistLikeAlbums.length, 'items');
           res.json(response);
           return;
         }
       } catch (newReleasesError) {
-        console.error('❌ New releases fallback also failed:', newReleasesError);
+        console.warn('New releases fallback failed for featured playlists route');
       }
-      
-      console.log('🎵 Using demo playlists as final fallback...');
+
       // Final fallback: Return demo playlists
       const demoPlaylists = [
         {
@@ -653,6 +652,33 @@ export const getCategoryPlaylists: RequestHandler = async (req: AuthenticatedReq
   } catch (error) {
     console.error('Error getting category playlists:', error);
     res.status(500).json({ error: 'Failed to get category playlists' });
+  }
+};
+
+/** Trending songs & artists for India (Spotify market IN, editorial + search fallbacks). */
+export const getIndiaTrending: RequestHandler = async (req: AuthenticatedRequest, res) => {
+  try {
+    let accessToken = req.user?.spotifyAccessToken;
+    if (!accessToken) {
+      const clientToken = await spotifyService.getClientCredentialsToken();
+      accessToken = clientToken.access_token;
+    }
+
+    const data = await spotifyService.getIndiaTrending(accessToken);
+    res.json(data);
+  } catch (error: unknown) {
+    console.error('Error getting India trending:', error);
+    const ax = error as {
+      message?: string;
+      response?: { data?: { error?: string | { message?: string } }; status?: number };
+    };
+    const bodyErr = ax?.response?.data?.error;
+    const msg =
+      (typeof bodyErr === 'string' ? bodyErr : bodyErr?.message) ||
+      ax?.message ||
+      'Could not load trending music. Check Spotify API credentials (SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET) and restart the server.';
+    const status = ax?.response?.status && ax.response.status < 500 ? ax.response.status : 500;
+    res.status(status).json({ error: msg });
   }
 };
 

@@ -39,6 +39,7 @@ import {
   getNewReleases,
   getCategories,
   getCategoryPlaylists,
+  getIndiaTrending,
   getRecommendations,
   getGenreSeeds,
   checkSavedTracks,
@@ -137,6 +138,7 @@ export function createServer() {
   app.get("/api/spotify/new-releases", optionalAuthenticate, getNewReleases);
   app.get("/api/spotify/categories", optionalAuthenticate, getCategories);
   app.get("/api/spotify/categories/:id/playlists", optionalAuthenticate, getCategoryPlaylists);
+  app.get("/api/spotify/trending/india", optionalAuthenticate, getIndiaTrending);
   app.get("/api/spotify/recommendations", optionalAuthenticate, getRecommendations);
   app.get("/api/spotify/genre-seeds", optionalAuthenticate, getGenreSeeds);
 

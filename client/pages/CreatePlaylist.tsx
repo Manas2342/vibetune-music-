@@ -22,7 +22,7 @@ interface Track {
 
 export default function CreatePlaylist() {
   const { createPlaylist, addToPlaylist, removeFromPlaylist, playlists, deletePlaylist } = useLibrary();
-  const { playTrack, currentTrack, isPlaying } = useMusicPlayer();
+  const { playTrack, currentTrack, isPlaying, togglePlayPause } = useMusicPlayer();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -171,6 +171,10 @@ export default function CreatePlaylist() {
   const handlePlay = async (track: any) => {
     if (playTrack) {
       try {
+        if (currentTrack?.id === track.id) {
+          togglePlayPause();
+          return;
+        }
         await playTrack({
           id: track.id,
           title: track.title,

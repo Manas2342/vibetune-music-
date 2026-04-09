@@ -35,7 +35,7 @@ export default function Artist() {
   const [artist, setArtist] = useState<Artist | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
-  const { playTrack } = useMusicPlayer();
+  const { playTrack, currentTrack, togglePlayPause } = useMusicPlayer();
   const { toggleLike, isLiked } = useLibrary();
   const { toast } = useToast();
 
@@ -77,11 +77,15 @@ export default function Artist() {
 
   const handlePlayTrack = async (track: Track) => {
     try {
+      if (currentTrack?.id === track.id) {
+        togglePlayPause();
+        return;
+      }
       const trackData = {
         id: track.id,
         title: track.name,
         artist: track.artists.map(a => a.name).join(', '),
-        image: track.album.images[0]?.url || '/placeholder.svg',
+        albumArt: track.album.images[0]?.url || '/placeholder.svg',
         previewUrl: track.preview_url,
         duration: track.duration_ms,
         url: track.external_urls.spotify,

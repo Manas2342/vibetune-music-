@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Search as SearchIcon, TrendingUp, Play, Clock, Heart } from "lucide-react";
+import { Search as SearchIcon, TrendingUp, Play, Clock, Heart, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLibrary } from "@/contexts/LibraryContext";
 import { useSearchParams } from "react-router-dom";
 import spotifyService from "../services/spotifyService";
+import { useToast } from "@/hooks/use-toast";
 // Simple debounce implementation
 const debounce = (func: (...args: any[]) => void, delay: number) => {
   let timeoutId: NodeJS.Timeout;
@@ -74,12 +75,9 @@ const trendingSearches = [
 // Search function
 const searchMusic = async (query: string): Promise<SearchResults> => {
   if (!query.trim()) return { tracks: { items: [], total: 0 } };
-  
-  const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}&type=track&limit=20`);
-  if (!response.ok) {
-    throw new Error('Failed to search');
-  }
-  return response.json();
+
+  // Use authenticated client service so Spotify returns tracks for this user account market.
+  return spotifyService.search(query, 'track', 20, 0) as Promise<SearchResults>;
 };
 
 // Format duration helper
@@ -127,10 +125,12 @@ export default function Search() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+  const [spotifyCategories, setSpotifyCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [searchParams] = useSearchParams();
-  const { playTrack, currentTrack, isPlaying } = useMusicPlayer?.() || {};
+  const { playTrack, currentTrack, isPlaying, togglePlayPause } = useMusicPlayer?.() || {};
   const { user } = useAuth();
   const { isLiked, toggleLike } = useLibrary();
+  const { toast } = useToast();
   const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
   
   // Get the type parameter from URL
@@ -150,6 +150,20 @@ export default function Search() {
       debouncedSearch.cancel();
     };
   }, [searchQuery, debouncedSearch]);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const categories = await spotifyService.getCategories(20, 0);
+        const items = categories?.categories?.items || [];
+        setSpotifyCategories(items.map((c: any) => ({ id: c.id, name: c.name })));
+      } catch (error) {
+        // Keep fallback browse categories if this call fails
+        setSpotifyCategories([]);
+      }
+    };
+    loadCategories();
+  }, []);
 
   // Search query based on type
   const { data: searchResults, isLoading, error } = useQuery<any>({
@@ -192,6 +206,10 @@ export default function Search() {
   const handlePlay = async (track: Track) => {
     if (playTrack) {
       try {
+        if (currentTrack?.id === track.id && togglePlayPause) {
+          togglePlayPause();
+          return;
+        }
         await playTrack({
           id: track.id,
           title: track.name,
@@ -258,6 +276,61 @@ export default function Search() {
         url: track.preview_url || track.external_urls.spotify,
       };
       toggleLike(musicTrack);
+    }
+  };
+
+  const handleDownload = async (track: Track) => {
+    const sessionToken = localStorage.getItem("spotifySessionToken");
+    if (!sessionToken) {
+      toast({
+        title: "Spotify not connected",
+        description: "Please connect Spotify first to download tracks.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!track.preview_url) {
+      toast({
+        title: "Download unavailable",
+        description: "This track has no preview audio URL from Spotify.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/offline/download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({
+          trackId: track.id,
+          trackName: track.name,
+          artistName: track.artists?.map((a) => a.name).join(", ") || "Unknown Artist",
+          audioUrl: track.preview_url,
+          quality: "high",
+          format: "mp3",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      toast({
+        title: "Download started",
+        description: `${track.name} is being saved offline.`,
+      });
+    } catch (error) {
+      console.error("Failed to start download:", error);
+      toast({
+        title: "Download failed",
+        description: "Could not start download. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -328,6 +401,18 @@ export default function Search() {
                   </div>
                   
                   <div className="flex items-center space-x-4 text-vibetune-text-muted">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-8 h-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-vibetune-text-muted hover:text-vibetune-green"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownload(track);
+                      }}
+                      title={track.preview_url ? "Download for offline" : "No preview URL available"}
+                    >
+                      <Download className="w-4 h-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -434,7 +519,14 @@ export default function Search() {
         <section>
           <h2 className="text-2xl font-bold text-white mb-4">Browse all</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {browseCategories.map((category, index) => (
+            {(spotifyCategories.length
+              ? spotifyCategories.map((category, idx) => ({
+                  name: category.name,
+                  color: browseCategories[idx % browseCategories.length].color,
+                  query: category.name,
+                }))
+              : browseCategories
+            ).map((category, index) => (
               <div
                 key={index}
                 className={`${category.color} rounded-lg p-4 h-32 relative overflow-hidden cursor-pointer hover:scale-105 transition-transform`}

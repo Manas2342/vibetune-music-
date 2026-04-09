@@ -11,10 +11,10 @@ export const downloadTrack: RequestHandler = async (req: AuthenticatedRequest, r
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const { trackId, trackName, artistName, quality, format } = req.body;
+    const { trackId, trackName, artistName, audioUrl, quality, format } = req.body;
 
-    if (!trackId || !trackName || !artistName) {
-      return res.status(400).json({ error: 'Missing required fields: trackId, trackName, artistName' });
+    if (!trackId || !trackName || !artistName || !audioUrl) {
+      return res.status(400).json({ error: 'Missing required fields: trackId, trackName, artistName, audioUrl' });
     }
 
     // Start download in background
@@ -23,6 +23,7 @@ export const downloadTrack: RequestHandler = async (req: AuthenticatedRequest, r
       trackId,
       trackName,
       artistName,
+      audioUrl,
       { quality: quality || 'high', format: format || 'mp3' }
     ).catch(error => {
       console.error('Background download error:', error);
@@ -47,7 +48,7 @@ export const getDownloadProgress: RequestHandler = async (req: AuthenticatedRequ
     }
 
     const { trackId } = req.params;
-    const progress = offlineMusicService.getDownloadProgress(req.user.id, trackId);
+    const progress = offlineMusicService.getDownloadProgress(trackId);
 
     res.json({ progress });
   } catch (error) {
@@ -249,12 +250,13 @@ export const batchDownload: RequestHandler = async (req: AuthenticatedRequest, r
     }
 
     // Start batch downloads
-    const downloadPromises = tracks.map(track => 
+    const downloadPromises = tracks.map(track =>
       offlineMusicService.downloadTrack(
         req.user!.id,
         track.trackId,
         track.trackName,
         track.artistName,
+        track.audioUrl,
         options || { quality: 'high', format: 'mp3' }
       ).catch(error => {
         console.error(`Error downloading track ${track.trackId}:`, error);

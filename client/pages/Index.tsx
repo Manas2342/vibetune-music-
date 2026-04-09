@@ -11,6 +11,15 @@ import { useToast } from "@/hooks/use-toast";
 
 type NewRelease = { id: string; name: string; artists: { name: string }[]; images?: { url: string }[] };
 type TopArtist = { id: string; name: string; images?: { url: string }[]; followers?: { total: number } };
+type TopTrack = {
+  id: string;
+  name: string;
+  artists: { name: string }[];
+  duration_ms: number;
+  preview_url?: string;
+  album?: { images?: { url: string }[] };
+  external_urls?: { spotify?: string };
+};
 
 type PlayedItem = { id: string; title: string; artist: string; image: string };
 
@@ -22,6 +31,7 @@ export default function Index() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [newReleases, setNewReleases] = useState<NewRelease[]>([]);
   const [topArtists, setTopArtists] = useState<TopArtist[]>([]);
+  const [topTracks, setTopTracks] = useState<TopTrack[]>([]);
   const [recentlyPlayed, setRecentlyPlayed] = useState<PlayedItem[]>([]);
   const [vibetuneRecentlyPlayed, setVibetuneRecentlyPlayed] = useState<PlayedItem[]>([]);
   const [featuredPlaylists, setFeaturedPlaylists] = useState<any[]>([]);
@@ -78,8 +88,32 @@ export default function Index() {
         setNewReleases(nr.albums?.items || []);
       } catch {}
       try {
-        const ta = await spotifyService.getTopArtists(12, 0);
-        setTopArtists(ta.artists?.items || []);
+        // Prefer personalized top artists when user is authenticated.
+        if (connected) {
+          try {
+            const personalizedArtists = await spotifyService.getTopItems('artists', 12, 0, 'short_term');
+            const artistItems = personalizedArtists?.items || [];
+            if (artistItems.length > 0) {
+              setTopArtists(artistItems);
+            } else {
+              const ta = await spotifyService.getTopArtists(12, 0);
+              setTopArtists(ta?.artists?.items || ta?.items || []);
+            }
+          } catch {
+            // If personalized endpoint fails (token/scope/session issues), still show public artists.
+            const ta = await spotifyService.getTopArtists(12, 0);
+            setTopArtists(ta?.artists?.items || ta?.items || []);
+          }
+        } else {
+          const ta = await spotifyService.getTopArtists(12, 0);
+          setTopArtists(ta?.artists?.items || ta?.items || []);
+        }
+      } catch {
+        setTopArtists([]);
+      }
+      try {
+        const tt = await spotifyService.getTopItems('tracks', 12, 0, 'short_term');
+        setTopTracks(tt.items || []);
       } catch {}
       try {
         const fp = await spotifyService.getFeaturedPlaylists(6, 0);
@@ -315,6 +349,90 @@ export default function Index() {
         </div>
       </section>
 
+      {/* Your Top Tracks */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-white">Your Top Tracks</h2>
+          <Button
+            variant="ghost"
+            className="text-vibetune-text-muted hover:text-white"
+            onClick={() => navigate('/search')}
+          >
+            Discover more
+          </Button>
+        </div>
+        {topTracks.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {topTracks.slice(0, 9).map((track, index) => (
+              <div
+                key={track.id}
+                className="group flex items-center gap-3 rounded-lg bg-vibetune-gray/35 hover:bg-vibetune-gray/60 p-3 transition-colors cursor-pointer"
+                onClick={async () => {
+                  try {
+                    await playTrack({
+                      id: track.id,
+                      title: track.name,
+                      artist: (track.artists || []).map((a) => a.name).join(', '),
+                      albumArt: track.album?.images?.[0]?.url || '',
+                      duration: track.duration_ms,
+                      url: track.preview_url || track.external_urls?.spotify || '',
+                      spotifyId: track.id,
+                      previewUrl: track.preview_url,
+                      isSpotifyTrack: true,
+                      quality: 'high',
+                    });
+                  } catch (error) {
+                    console.error('Error playing top track:', error);
+                  }
+                }}
+              >
+                <div className="w-8 text-sm text-vibetune-text-muted font-semibold">{index + 1}</div>
+                <img
+                  src={track.album?.images?.[0]?.url || '/placeholder.svg'}
+                  alt={track.name}
+                  className="w-12 h-12 rounded-md object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-white font-medium truncate">{track.name}</p>
+                  <p className="text-xs text-vibetune-text-muted truncate">
+                    {(track.artists || []).map((a) => a.name).join(', ')}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity bg-vibetune-green hover:bg-vibetune-green-dark text-black rounded-full w-9 h-9 p-0"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      await playTrack({
+                        id: track.id,
+                        title: track.name,
+                        artist: (track.artists || []).map((a) => a.name).join(', '),
+                        albumArt: track.album?.images?.[0]?.url || '',
+                        duration: track.duration_ms,
+                        url: track.preview_url || track.external_urls?.spotify || '',
+                        spotifyId: track.id,
+                        previewUrl: track.preview_url,
+                        isSpotifyTrack: true,
+                        quality: 'high',
+                      });
+                    } catch (error) {
+                      console.error('Error playing top track:', error);
+                    }
+                  }}
+                >
+                  <Play className="w-4 h-4 ml-0.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-vibetune-gray bg-vibetune-gray/20 p-5 text-vibetune-text-muted">
+            Connect Spotify and start listening to see your personalized top tracks here.
+          </div>
+        )}
+      </section>
+
       {/* Recently Played */}
       <section className="mb-8">
         <div className="flex items-center justify-between mb-4">
@@ -533,96 +651,102 @@ export default function Index() {
             Show all
           </Button>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {topArtists.map((artist) => (
-            <div 
-              key={artist.id} 
-              className="group cursor-pointer"
-              onClick={async () => {
-                try {
-                  toast({
-                    title: "🎵 Loading Artist",
-                    description: `Loading ${artist.name}...`,
-                  });
-                  // Navigate to artist page or search for tracks
-                  navigate(`/artist/${artist.id}`);
-                } catch (error) {
-                  console.error('Error loading artist:', error);
-                  toast({
-                    title: "❌ Error",
-                    description: "Failed to load artist. Please try again.",
-                    variant: "destructive",
-                  });
-                }
-              }}
-            >
-              <div className="relative mb-3">
-                {artist.images?.[0]?.url ? (
-                  <img src={artist.images[0].url} alt={artist.name} className="w-full aspect-square object-cover rounded-full" />
-                ) : (
-                  <div className="w-full aspect-square rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center">
-                    <Music className="w-8 h-8 text-white" />
-                  </div>
-                )}
-                <Button
-                  size="sm"
-                  className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-vibetune-green hover:bg-vibetune-green-dark text-black rounded-full w-12 h-12 p-0 shadow-lg"
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    try {
-                      toast({
-                        title: "🎵 Loading Artist",
-                        description: `Loading ${artist.name} top tracks...`,
-                      });
-                      
-                      // Get artist's top tracks and play the first one
-                      const topTracks = await spotifyService.getArtistTopTracks(artist.id, 'US');
-                      if (topTracks.tracks && topTracks.tracks.length > 0) {
-                        const firstTrack = topTracks.tracks[0];
-                        await playTrack({
-                          id: firstTrack.id,
-                          title: firstTrack.name,
-                          artist: firstTrack.artists.map(a => a.name).join(', '),
-                          albumArt: firstTrack.album.images[0]?.url || '',
-                          duration: firstTrack.duration_ms,
-                          url: firstTrack.preview_url || firstTrack.external_urls?.spotify || '',
-                          spotifyId: firstTrack.id,
-                          previewUrl: firstTrack.preview_url,
-                          isSpotifyTrack: true,
-                          quality: 'high'
-                        });
-                        
+        {topArtists.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {topArtists.map((artist) => (
+              <div
+                key={artist.id}
+                className="group cursor-pointer"
+                onClick={async () => {
+                  try {
+                    toast({
+                      title: "🎵 Loading Artist",
+                      description: `Loading ${artist.name}...`,
+                    });
+                    // Navigate to artist page or search for tracks
+                    navigate(`/artist/${artist.id}`);
+                  } catch (error) {
+                    console.error('Error loading artist:', error);
+                    toast({
+                      title: "❌ Error",
+                      description: "Failed to load artist. Please try again.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                <div className="relative mb-3">
+                  {artist.images?.[0]?.url ? (
+                    <img src={artist.images[0].url} alt={artist.name} className="w-full aspect-square object-cover rounded-full" />
+                  ) : (
+                    <div className="w-full aspect-square rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center">
+                      <Music className="w-8 h-8 text-white" />
+                    </div>
+                  )}
+                  <Button
+                    size="sm"
+                    className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-vibetune-green hover:bg-vibetune-green-dark text-black rounded-full w-12 h-12 p-0 shadow-lg"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
                         toast({
-                          title: "🎵 Now Playing",
-                          description: `${firstTrack.name} by ${firstTrack.artists.map(a => a.name).join(', ')}`,
+                          title: "🎵 Loading Artist",
+                          description: `Loading ${artist.name} top tracks...`,
                         });
-                      } else {
+
+                        // Get artist's top tracks and play the first one
+                        const topTracks = await spotifyService.getArtistTopTracks(artist.id, 'US');
+                        if (topTracks.tracks && topTracks.tracks.length > 0) {
+                          const firstTrack = topTracks.tracks[0];
+                          await playTrack({
+                            id: firstTrack.id,
+                            title: firstTrack.name,
+                            artist: firstTrack.artists.map(a => a.name).join(', '),
+                            albumArt: firstTrack.album.images[0]?.url || '',
+                            duration: firstTrack.duration_ms,
+                            url: firstTrack.preview_url || firstTrack.external_urls?.spotify || '',
+                            spotifyId: firstTrack.id,
+                            previewUrl: firstTrack.preview_url,
+                            isSpotifyTrack: true,
+                            quality: 'high'
+                          });
+
+                          toast({
+                            title: "🎵 Now Playing",
+                            description: `${firstTrack.name} by ${firstTrack.artists.map(a => a.name).join(', ')}`,
+                          });
+                        } else {
+                          toast({
+                            title: "❌ No Tracks Found",
+                            description: `No top tracks available for ${artist.name}`,
+                            variant: "destructive",
+                          });
+                        }
+                      } catch (error) {
+                        console.error('Error playing artist:', error);
                         toast({
-                          title: "❌ No Tracks Found",
-                          description: `No top tracks available for ${artist.name}`,
+                          title: "❌ Error",
+                          description: "Failed to play artist. Please try again.",
                           variant: "destructive",
                         });
                       }
-                    } catch (error) {
-                      console.error('Error playing artist:', error);
-                      toast({
-                        title: "❌ Error",
-                        description: "Failed to play artist. Please try again.",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                >
-                  <Play className="w-5 h-5 ml-0.5" />
-                </Button>
+                    }}
+                  >
+                    <Play className="w-5 h-5 ml-0.5" />
+                  </Button>
+                </div>
+                <h3 className="font-semibold text-white truncate">{artist.name}</h3>
+                <p className="text-sm text-vibetune-text-muted truncate">
+                  {artist.followers?.total ? `${Math.floor(artist.followers.total / 1000)}K followers` : 'Artist'}
+                </p>
               </div>
-              <h3 className="font-semibold text-white truncate">{artist.name}</h3>
-              <p className="text-sm text-vibetune-text-muted truncate">
-                {artist.followers?.total ? `${Math.floor(artist.followers.total / 1000)}K followers` : 'Artist'}
-              </p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-vibetune-gray bg-vibetune-gray/20 p-5 text-vibetune-text-muted">
+            Connect Spotify and listen more to see your top artists here.
+          </div>
+        )}
       </section>
 
       {/* Popular Albums */}
